@@ -1,0 +1,39 @@
+accelerate>=0.26.0  # required by HayenaDNA
+datasets
+pandas
+polars  # try to use polars. it's faster than pandas
+numpy
+matplotlib
+scipy
+shap
+scikit-learn
+skorch  # ==1.0.0
+six
+hyperopt
+requests
+pyyaml
+Bio
+plotly
+Levenshtein
+captum
+torch # ==2.4.0
+torchvision
+torchaudio
+torchsummary
+torcheval
+pydot
+pydotplus
+PySide2  # matplotlib dependency on ubuntu. you may need sth else for other os/env setup
+torchviz
+gReLU
+torchmetrics
+transformers
+huggingface-hub
+python-dotenv
+tk
+pytest
+transformers[torch]
+huggingface
+wandb
+evaluate
+huggingface_hub[hf_xet]  # sth to do with offline support
