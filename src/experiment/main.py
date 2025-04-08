@@ -18,6 +18,7 @@ import os
 
 import evaluate
 import huggingface_hub
+from huggingface_hub import HfApi
 import numpy as np
 import wandb
 from datasets import load_dataset, Dataset
@@ -82,25 +83,14 @@ def getGpuName():
     return gpu_name
 
 # for hyenaDna. its tokenizer can process longer sequences...
-def sequenceEncodePlusDefault(
+def sequenceEncodePlusForHyenaDna(
     tokenizer: BertTokenizer,
     sequence: str,
     label: int
 ) -> BatchEncoding:
-    tempMap: BatchEncoding = tokenizer.encode_plus(
-        sequence,
-        add_special_tokens=True,
-        return_attention_mask=True,
-        return_tensors="pt"
-    )
-
-    someInputIds1xN = tempMap["input_ids"]  # shape = 1xN , N = sequence length
-    # someMasks1xN = tempMap["attention_mask"]   # does not exist for hyena dna :/
-    input_ids: torch.Tensor = torch.Tensor(someInputIds1xN)
-    # attention_mask: torch.Tensor = torch.Tensor(someMasks1xN)
-
+    input_ids = tokenizer(sequence)["input_ids"]
+    input_ids: torch.Tensor = torch.Tensor(input_ids)
     label_tensor = torch.tensor(label)
-
     encoded_map: dict = {
         "input_ids": input_ids.long(),
         # "attention_mask": attention_mask.int(),    # hyenaDNA does not have attention layer
@@ -189,7 +179,7 @@ def sequenceEncodePlusCompact(
     if splitSequence:
         return sequenceEncodePlusWithSplitting(tokenizer, sequence, label)
     else:
-        return sequenceEncodePlusDefault(tokenizer, sequence, label)
+        return sequenceEncodePlusForHyenaDna(tokenizer, sequence, label)
 
 
 class PagingMQTLDataset(IterableDataset):
@@ -220,6 +210,10 @@ class PagingMQTLDataset(IterableDataset):
             return None  # skip a few problematic rows
 
         return sequenceEncodePlusCompact(self.splitSequenceRequired, self.bertTokenizer, sequence, label)
+
+def isMyLaptop() -> bool:
+    is_my_laptop = os.path.isfile("/home/gamegame/PycharmProjects/mqtl-classification/src/datageneration/dataset_4000_train_binned.csv")
+    return is_my_laptop
 
 
 def signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases():
@@ -281,7 +275,7 @@ def createPagingTrainValTestDatasets(tokenizer, window, splitSequenceRequired) -
     }
 
     dataset_map = None
-    is_my_laptop = os.path.isfile("/home/gamegame/PycharmProjects/mqtl-classification/src/datageneration/dataset_4000_train_binned.csv")
+    is_my_laptop = isMyLaptop()
     if is_my_laptop:
         dataset_map = load_dataset("csv", data_files=data_files, streaming=True)
     else:
@@ -385,11 +379,12 @@ MAX_STEPS = EPOCHS * STEPS_PER_EPOCH
 def start():
     timber.info(green)
     timber.info("---Inside start function---")
+    timber.info(f"{PER_DEVICE_BATCH_SIZE = }")
 
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-    # signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases()
-    wandb.init(mode="offline")  # Logs only locally
 
+    # wandb.init(mode="offline")  # Logs only locally
+    signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases()
 
     config = AutoConfig.from_pretrained(MODEL_NAME, trust_remote_code=True)
     print("Model architecture:", config.architectures)
@@ -419,7 +414,8 @@ def start():
         max_steps=MAX_STEPS,
         weight_decay=0.01,
         learning_rate=1e-3,
-        logging_dir="./logs"
+        logging_dir="./logs",
+        save_safetensors=False
     )
 
     dataCollator = DataCollatorWithPadding(tokenizer=mainTokenizer)
@@ -453,7 +449,7 @@ def start():
 
     mainModel.save_pretrained(save_directory=SAVE_MODEL_IN_LOCAL_DIRECTORY, safe_serialization=False)
     # push to the hub
-    is_my_laptop = os.path.isfile("/home/gamegame/PycharmProjects/mqtl-classification/src/datageneration/dataset_4000_train_binned.csv")
+    is_my_laptop = isMyLaptop()
 
     commit_message = f":tada: Push model for window size {WINDOW} from huggingface space"
     if is_my_laptop:

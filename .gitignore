@@ -181,3 +181,24 @@ src/lightning_logs/
 !/src/datageneration/_06_uploaddataset_to_hugging_face.py
 !/src/datageneration/_10_convert_tsv_into_sqlite.py
 !/src/datageneration/_11_sql_commands.sql
+
+# Ignore PyTorch model checkpoints and outputs
+output_checkpoints/
+*.bin
+*.pt
+
+# Ignore saved model folders
+saved_model/
+model/
+checkpoint/
+
+# Ignore Hugging Face transformer training outputs
+runs/
+logs/
+
+# Ignore specific output directories for Hugging Face models
+*.json
+*.csv
+
+# Ignore temp files created during training
+*.lock
