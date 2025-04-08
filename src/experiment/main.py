@@ -12,6 +12,10 @@ the steps:
 * save the kaggle notebook result into github
 """
 import logging
+import os
+import wandb
+import huggingface_hub
+from dotenv import load_dotenv
 
 from torch.utils.data import DataLoader, IterableDataset
 
@@ -213,14 +217,62 @@ class PagingMQTLDataset(IterableDataset):
         return sequenceEncodePlusCompact(self.splitSequenceRequired, self.bertTokenizer, sequence, label)
 
 
+def signin_to_huggingface_and_wandb_to_upload_model_weights_and_biases():
+    # Load the .env file, but don't crash if it's not found (e.g., in Hugging Face Space)
+    try:
+        load_dotenv()  # Only useful on your laptop if .env exists
+        print(".env file loaded successfully.")
+    except Exception as e:
+        print(f"Warning: Could not load .env file. Exception: {e}")
 
+    # Try to get the token from environment variables
+    try:
+        token = os.getenv("HF_TOKEN")
+
+        if not token:
+            raise ValueError("HF_TOKEN not found. Make sure to set it in the environment variables or .env file.")
+
+        # Log in to Hugging Face Hub
+        huggingface_hub.login(token)
+        print("Logged in to Hugging Face Hub successfully.")
+
+    except Exception as e:
+        print(f"Error during Hugging Face login: {e}")
+        # Handle the error appropriately (e.g., exit or retry)
+
+    # wand db login
+    try:
+        api_key = os.getenv("WAND_DB_API_KEY")
+        timber.info(f"{api_key = }")
+
+        if not api_key:
+            raise ValueError(
+                "WAND_DB_API_KEY not found. Make sure to set it in the environment variables or .env file.")
+
+        # Log in to Hugging Face Hub
+        wandb.login(key=api_key)
+        print("Logged in to wand db successfully.")
+
+    except Exception as e:
+        print(f"Error during wand db Face login: {e}")
+    pass
 
 
 """ dynamic section. may be some consts,  changes based on model, etc. Try to keep it as small as possible """
-MODEL_NAME = ""
+
+MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
+WINDOW = 4000
+BATCH_SIZE = getDynamicBatchSize()
+
 
 """ main """
 def start():
+    timber.info(green)
+    timber.info("---Inside start function---")
+
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+    signin_to_huggingface_and_wandb_to_upload_model_weights_and_biases()
+
     pass
 
 if __name__ == "__main__":
