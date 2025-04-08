@@ -11,16 +11,21 @@ the steps:
 * push weights, & biases to wandb
 * save the kaggle notebook result into github
 """
-import logging
-import os
-import wandb
-import huggingface_hub
-from dotenv import load_dotenv
-
-from torch.utils.data import DataLoader, IterableDataset
 
 """ import dependencies """
-from transformers import BertTokenizer, BatchEncoding
+import logging
+import os
+
+import evaluate
+import huggingface_hub
+import numpy as np
+import wandb
+from datasets import load_dataset, Dataset
+from dotenv import load_dotenv
+from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, roc_auc_score
+from torch.utils.data import IterableDataset
+from transformers import BertTokenizer, BatchEncoding, AutoTokenizer, \
+    AutoModelForSequenceClassification, AutoConfig, TrainingArguments, Trainer, DataCollatorWithPadding
 import torch
 
 
@@ -90,15 +95,15 @@ def sequenceEncodePlusDefault(
     )
 
     someInputIds1xN = tempMap["input_ids"]  # shape = 1xN , N = sequence length
-    someMasks1xN = tempMap["attention_mask"]
+    # someMasks1xN = tempMap["attention_mask"]   # does not exist for hyena dna :/
     input_ids: torch.Tensor = torch.Tensor(someInputIds1xN)
-    attention_mask: torch.Tensor = torch.Tensor(someMasks1xN)
+    # attention_mask: torch.Tensor = torch.Tensor(someMasks1xN)
 
     label_tensor = torch.tensor(label)
 
     encoded_map: dict = {
         "input_ids": input_ids.long(),
-        "attention_mask": attention_mask.int(),
+        # "attention_mask": attention_mask.int(),    # hyenaDNA does not have attention layer
         "labels": label_tensor
     }
 
@@ -190,7 +195,7 @@ def sequenceEncodePlusCompact(
 class PagingMQTLDataset(IterableDataset):
     def __init__(
             self,
-            someDataset,  # todo: set type
+            someDataset: Dataset,
             bertTokenizer: BertTokenizer,
             seqLength: int,
             splitSequenceRequired: bool
@@ -217,7 +222,7 @@ class PagingMQTLDataset(IterableDataset):
         return sequenceEncodePlusCompact(self.splitSequenceRequired, self.bertTokenizer, sequence, label)
 
 
-def signin_to_huggingface_and_wandb_to_upload_model_weights_and_biases():
+def signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases():
     # Load the .env file, but don't crash if it's not found (e.g., in Hugging Face Space)
     try:
         load_dotenv()  # Only useful on your laptop if .env exists
@@ -257,13 +262,124 @@ def signin_to_huggingface_and_wandb_to_upload_model_weights_and_biases():
         print(f"Error during wand db Face login: {e}")
     pass
 
+def createPagingTrainValTestDatasets(tokenizer, window, splitSequenceRequired) -> (PagingMQTLDataset, PagingMQTLDataset, PagingMQTLDataset):
+    prefix = "/home/gamegame/PycharmProjects/mqtl-classification/"
+    data_files = {
+        # small samples
+        "train_binned_200": f"{prefix}src/datageneration/dataset_200_train_binned.csv",
+        "validate_binned_200": f"{prefix}src/datageneration/dataset_200_validate_binned.csv",
+        "test_binned_200": f"{prefix}src/datageneration/dataset_200_test_binned.csv",
+        # medium samples
+        "train_binned_1000": f"{prefix}src/datageneration/dataset_1000_train_binned.csv",
+        "validate_binned_1000": f"{prefix}src/datageneration/dataset_1000_train_binned.csv",
+        "test_binned_1000": f"{prefix}src/datageneration/dataset_1000_train_binned.csv",
+
+        # large samples
+        "train_binned_4000": f"{prefix}src/datageneration/dataset_4000_train_binned.csv",
+        "validate_binned_4000": f"{prefix}src/datageneration/dataset_4000_train_binned.csv",
+        "test_binned_4000": f"{prefix}src/datageneration/dataset_4000_train_binned.csv",
+    }
+
+    dataset_map = None
+    is_my_laptop = os.path.isfile("/home/gamegame/PycharmProjects/mqtl-classification/src/datageneration/dataset_4000_train_binned.csv")
+    if is_my_laptop:
+        dataset_map = load_dataset("csv", data_files=data_files, streaming=True)
+    else:
+        dataset_map = load_dataset("fahimfarhan/mqtl-classification-datasets", streaming=True)
+
+    train_dataset = PagingMQTLDataset(someDataset=dataset_map[f"train_binned_{window}"],
+                                    bertTokenizer=tokenizer,
+                                    seqLength=window,
+                                    splitSequenceRequired=splitSequenceRequired
+                                    )
+    val_dataset = PagingMQTLDataset(dataset_map[f"validate_binned_{window}"],
+                                  bertTokenizer=tokenizer,
+                                  seqLength=window,
+                                  splitSequenceRequired=splitSequenceRequired
+                                  )
+    test_dataset = PagingMQTLDataset(dataset_map[f"test_binned_{window}"],
+                                   bertTokenizer=tokenizer,
+                                   seqLength=window,
+                                   splitSequenceRequired=splitSequenceRequired
+                                   )
+    return train_dataset, val_dataset, test_dataset
+
+
+# Load metrics
+# global variables. bad practice...
+accuracy_metric = evaluate.load("accuracy")
+f1_metric = evaluate.load("f1")
+roc_auc_metric = evaluate.load("roc_auc")
+precision_metric = evaluate.load("precision")
+recall_metric = evaluate.load("recall")
+
+def computeMetricsUsingTorchEvaluate(args):
+    logits, labels = args
+    predictions = np.argmax(logits, axis=1)  # Get predicted class
+
+    positive_logits = logits[:, 1]  # Get positive class logits
+
+    accuracy = accuracy_metric.compute(predictions=predictions, references=labels)["accuracy"]
+    f1 = f1_metric.compute(predictions=predictions, references=labels, average="weighted")["f1"]
+    roc_auc = roc_auc_metric.compute(prediction_scores=positive_logits, references=labels)["roc_auc"]  # using positive_logits repairs the error
+    precision = precision_metric.compute(predictions=predictions, references=labels, average="weighted")["precision"]
+    recall = recall_metric.compute(predictions=predictions, references=labels, average="weighted")["recall"]
+
+    return {
+        "accuracy": accuracy,
+        "roc_auc": roc_auc,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1
+    }
+
+# use sklearn cz torchmetrics.classification gave array index out of bound exception :/ (whatever it is called in python)
+def computeMetricsUsingSkLearn(args):
+    #try:
+    logits, labels = args
+    # Get predicted class labels
+    predictions = np.argmax(logits, axis=1)
+
+    # Get predicted probabilities for the positive class
+    positive_logits = logits[:, 1]  # Assuming binary classification and 2 output classes
+
+    accuracy = accuracy_score(y_true=labels, y_pred=predictions)
+    recall = recall_score(y_true=labels, y_pred=predictions)
+    precision = precision_score(y_true=labels, y_pred=predictions)
+    f1 = f1_score(y_true=labels, y_pred=predictions)
+    roc_auc = roc_auc_score(y_true=labels, y_score=positive_logits)
+
+    return {
+      "accuracy": accuracy,
+      "roc_auc": roc_auc,
+      "precision": precision,
+      "recall": recall,
+      "f1": f1
+    }
+    #except Exception as x:
+    #    timber.error(f"compute_metrics_using_sklearn failed with exception: {x}")
+    #    return {"accuracy": 0, "roc_auc": 0, "precision": 0, "recall": 0, "f1": 0}
+
 
 """ dynamic section. may be some consts,  changes based on model, etc. Try to keep it as small as possible """
 
+RUN_NAME = "hyena-dna-mqtl-classifier"
 MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
-WINDOW = 4000
-BATCH_SIZE = getDynamicBatchSize()
+SPLIT_SEQUENCE_REQUIRED=False
+WINDOW = 200
 
+SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}-{WINDOW}"
+SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}-{WINDOW}"
+
+
+NUM_ROWS = 20 # 20_000    # hardcoded value
+PER_DEVICE_BATCH_SIZE = getDynamicBatchSize()
+EPOCHS = 3
+NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
+
+effective_batch_size = PER_DEVICE_BATCH_SIZE * NUM_GPUS
+STEPS_PER_EPOCH = NUM_ROWS // effective_batch_size
+MAX_STEPS = EPOCHS * STEPS_PER_EPOCH
 
 """ main """
 def start():
@@ -271,8 +387,84 @@ def start():
     timber.info("---Inside start function---")
 
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-    signin_to_huggingface_and_wandb_to_upload_model_weights_and_biases()
+    # signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases()
+    wandb.init(mode="offline")  # Logs only locally
 
+
+    config = AutoConfig.from_pretrained(MODEL_NAME, trust_remote_code=True)
+    print("Model architecture:", config.architectures)
+
+    mainTokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
+    mainModel = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, trust_remote_code=True, num_labels=2)
+
+    isGpuAvailable = torch.cuda.is_available()
+    if isGpuAvailable:
+        mainModel = mainModel.to("cuda")  # not sure if it is necessary in the kaggle / huggingface virtual-machine
+
+
+    train_dataset, val_dataset, test_dataset = createPagingTrainValTestDatasets(tokenizer=mainTokenizer, window=WINDOW, splitSequenceRequired=SPLIT_SEQUENCE_REQUIRED)
+
+
+    trainingArgs = TrainingArguments(
+        run_name=RUN_NAME,
+        output_dir="output_checkpoints",
+        eval_strategy="steps",
+        save_strategy="steps",
+        logging_strategy="steps",
+        eval_steps=STEPS_PER_EPOCH,
+        save_steps=STEPS_PER_EPOCH,
+        logging_steps=STEPS_PER_EPOCH,
+        per_device_train_batch_size=PER_DEVICE_BATCH_SIZE,
+        per_device_eval_batch_size=PER_DEVICE_BATCH_SIZE,
+        max_steps=MAX_STEPS,
+        weight_decay=0.01,
+        learning_rate=1e-3,
+        logging_dir="./logs"
+    )
+
+    dataCollator = DataCollatorWithPadding(tokenizer=mainTokenizer)
+
+
+    print("create trainer")
+    trainer = Trainer(
+        model=mainModel,
+        args=trainingArgs,
+        train_dataset=train_dataset,  # train
+        eval_dataset=val_dataset,  # validate
+        data_collator=dataCollator,
+        compute_metrics=computeMetricsUsingTorchEvaluate
+    )
+
+
+    # train, and validate
+    result = trainer.train()
+    try:
+        print("-------Training completed. Results--------\n")
+        print(result)
+    except Exception as x:
+        print(f"{x = }")
+
+    test_results = trainer.evaluate(eval_dataset=test_dataset)
+    try:
+        print("-------Test completed. Results--------\n")
+        print(test_results)
+    except Exception as x:
+        print(f"{x = }")
+
+    mainModel.save_pretrained(save_directory=SAVE_MODEL_IN_LOCAL_DIRECTORY, safe_serialization=False)
+    # push to the hub
+    is_my_laptop = os.path.isfile("/home/gamegame/PycharmProjects/mqtl-classification/src/datageneration/dataset_4000_train_binned.csv")
+
+    commit_message = f":tada: Push model for window size {WINDOW} from huggingface space"
+    if is_my_laptop:
+      commit_message = f":tada: Push model for window size {WINDOW} from my laptop"
+
+    mainModel.push_to_hub(
+      repo_id=SAVE_MODEL_IN_REMOTE_REPOSITORY,
+      # subfolder=f"my-awesome-model-{WINDOW}", subfolder didn't work :/
+      commit_message=commit_message,  # f":tada: Push model for window size {WINDOW}"
+      safe_serialization=False
+    )
     pass
 
 if __name__ == "__main__":
