@@ -202,3 +202,6 @@ logs/
 
 # Ignore temp files created during training
 *.lock
+
+# ignore wandb files
+*.wandb

@@ -157,9 +157,11 @@ def sequenceEncodePlusWithSplitting(
 
 
     # so each item len = 512, and the last one may have some padding
-    input_ids: torch.Tensor = torch.stack(inputIdsList)
+    input_ids: torch.Tensor = torch.stack(inputIdsList).squeeze()  # what's with this squeeze / unsqueeze thing? o.O
     attention_mask: torch.Tensor = torch.stack(masksList)
     label_tensor = torch.tensor(label)
+
+    # print(f"{input_ids.shape = }")
 
     encoded_map: dict = {
         "input_ids": input_ids.long(),
@@ -357,10 +359,10 @@ def computeMetricsUsingSkLearn(args):
 
 """ dynamic section. may be some consts,  changes based on model, etc. Try to keep it as small as possible """
 
-RUN_NAME = "hyena-dna-mqtl-classifier"
-MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
-SPLIT_SEQUENCE_REQUIRED=False
-WINDOW = 200
+RUN_NAME = "dna-bert-6-mqtl-classifier" # "hyena-dna-mqtl-classifier"
+MODEL_NAME = "zhihan1996/DNA_bert_6" # "LongSafari/hyenadna-small-32k-seqlen-hf"
+SPLIT_SEQUENCE_REQUIRED=True          # False
+WINDOW = 4000  # use 200 on your local pc.
 
 SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}-{WINDOW}"
 SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}-{WINDOW}"
