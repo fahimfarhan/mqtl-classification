@@ -29,6 +29,8 @@ from transformers import BertTokenizer, BatchEncoding, AutoTokenizer, \
     AutoModelForSequenceClassification, AutoConfig, TrainingArguments, Trainer, DataCollatorWithPadding
 import torch
 
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # hyena dna requires this
+print("import dependencies completed")
 
 """ Common codes """
 # some colors for visual convenience
@@ -417,7 +419,9 @@ def start():
         weight_decay=0.01,
         learning_rate=1e-3,
         logging_dir="./logs",
-        save_safetensors=False
+        save_safetensors=False,
+        gradient_checkpointing=True,  # to prevent out of memory error
+        fp16=True  # to train faster
     )
 
     dataCollator = DataCollatorWithPadding(tokenizer=mainTokenizer)

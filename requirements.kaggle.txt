@@ -1,0 +1,5 @@
+!pip install evaluate
+!pip install huggingface
+!pip install huggingface_hub[hf_xet]  # sth to do with offline support
+!pip install python-dotenv
+!pip install wandb
