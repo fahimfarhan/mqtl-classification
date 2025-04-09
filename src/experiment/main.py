@@ -11,8 +11,9 @@ the steps:
 * push weights, & biases to wandb
 * save the kaggle notebook result into github
 """
-
 """ import dependencies """
+from datetime import datetime
+
 import logging
 import os
 
@@ -361,10 +362,14 @@ def computeMetricsUsingSkLearn(args):
 
 """ dynamic section. may be some consts,  changes based on model, etc. Try to keep it as small as possible """
 
-RUN_NAME = "dna-bert-6-mqtl-classifier" # "hyena-dna-mqtl-classifier"
 MODEL_NAME = "zhihan1996/DNA_bert_6" # "LongSafari/hyenadna-small-32k-seqlen-hf"
+run_name_prefix = "dna-bert-6-mqtl-classifier" # "hyena-dna-mqtl-classifier"
+run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+run_platform="laptop"
+
+RUN_NAME = f"{run_platform}-{run_name_prefix}-{run_name_suffix}"
 SPLIT_SEQUENCE_REQUIRED=True          # False
-WINDOW = 4000  # use 200 on your local pc.
+WINDOW = 1000  # use 200 on your local pc.
 
 SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}-{WINDOW}"
 SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}-{WINDOW}"
@@ -387,8 +392,11 @@ def start():
 
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-    # wandb.init(mode="offline")  # Logs only locally
-    signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases()
+    if isMyLaptop():
+        wandb.init(mode="offline")  # Logs only locally
+    else:
+        # datacenter eg huggingface or kaggle.
+        signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases()
 
     config = AutoConfig.from_pretrained(MODEL_NAME, trust_remote_code=True)
     print("Model architecture:", config.architectures)
@@ -411,8 +419,11 @@ def start():
         save_strategy="steps",
         logging_strategy="steps",
         eval_steps=STEPS_PER_EPOCH,
-        save_steps=STEPS_PER_EPOCH,
-        logging_steps=STEPS_PER_EPOCH,
+        save_steps=500,
+        logging_steps=1,  # ← more frequent logs
+        logging_first_step=True,  # ← log even the very first step
+        log_level="info",  # ← control log verbosity
+        log_level_replica="warning",   # ← useful if using multiple GPUs
         per_device_train_batch_size=PER_DEVICE_BATCH_SIZE,
         per_device_eval_batch_size=PER_DEVICE_BATCH_SIZE,
         max_steps=MAX_STEPS,
@@ -421,7 +432,8 @@ def start():
         logging_dir="./logs",
         save_safetensors=False,
         gradient_checkpointing=True,  # to prevent out of memory error
-        fp16=True  # to train faster
+        fp16=True,  # to train faster
+        report_to="wandb"
     )
 
     dataCollator = DataCollatorWithPadding(tokenizer=mainTokenizer)
@@ -437,14 +449,29 @@ def start():
         compute_metrics=computeMetricsUsingTorchEvaluate
     )
 
-
-    # train, and validate
-    result = trainer.train()
     try:
+        # train, and validate
+        result = trainer.train()
         print("-------Training completed. Results--------\n")
         print(result)
     except Exception as x:
         print(f"{x = }")
+    finally:
+        # in case sth goes wrong, upload the partially trained model so that I can work with something...
+        mainModel.save_pretrained(save_directory=SAVE_MODEL_IN_LOCAL_DIRECTORY, safe_serialization=False)
+        # push to the hub
+        is_my_laptop = isMyLaptop()
+
+        commit_message = f":tada: Push {RUN_NAME} model for window size {WINDOW} from huggingface space"
+        if is_my_laptop:
+            commit_message = f":tada: Push {RUN_NAME} model for window size {WINDOW} from my laptop"
+
+        mainModel.push_to_hub(
+            repo_id=SAVE_MODEL_IN_REMOTE_REPOSITORY,
+            # subfolder=f"my-awesome-model-{WINDOW}", subfolder didn't work :/
+            commit_message=commit_message,  # f":tada: Push model for window size {WINDOW}"
+            safe_serialization=False
+        )
 
     test_results = trainer.evaluate(eval_dataset=test_dataset)
     try:
@@ -453,20 +480,7 @@ def start():
     except Exception as x:
         print(f"{x = }")
 
-    mainModel.save_pretrained(save_directory=SAVE_MODEL_IN_LOCAL_DIRECTORY, safe_serialization=False)
-    # push to the hub
-    is_my_laptop = isMyLaptop()
 
-    commit_message = f":tada: Push model for window size {WINDOW} from huggingface space"
-    if is_my_laptop:
-      commit_message = f":tada: Push model for window size {WINDOW} from my laptop"
-
-    mainModel.push_to_hub(
-      repo_id=SAVE_MODEL_IN_REMOTE_REPOSITORY,
-      # subfolder=f"my-awesome-model-{WINDOW}", subfolder didn't work :/
-      commit_message=commit_message,  # f":tada: Push model for window size {WINDOW}"
-      safe_serialization=False
-    )
     pass
 
 if __name__ == "__main__":
