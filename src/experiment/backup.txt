@@ -1,0 +1,42 @@
+
+def createPagingTrainValTestDatasets(tokenizer, window, splitSequenceRequired) -> (PagingMQTLDataset, PagingMQTLDataset, PagingMQTLDataset):
+    prefix = "/home/gamegame/PycharmProjects/mqtl-classification/"
+    data_files = {
+        # small samples
+        "train_binned_200": f"{prefix}src/datageneration/dataset_200_train_binned.csv",
+        "validate_binned_200": f"{prefix}src/datageneration/dataset_200_validate_binned.csv",
+        "test_binned_200": f"{prefix}src/datageneration/dataset_200_test_binned.csv",
+        # medium samples
+        "train_binned_1000": f"{prefix}src/datageneration/dataset_1000_train_binned.csv",
+        "validate_binned_1000": f"{prefix}src/datageneration/dataset_1000_train_binned.csv",
+        "test_binned_1000": f"{prefix}src/datageneration/dataset_1000_train_binned.csv",
+
+        # large samples
+        "train_binned_4000": f"{prefix}src/datageneration/dataset_4000_train_binned.csv",
+        "validate_binned_4000": f"{prefix}src/datageneration/dataset_4000_train_binned.csv",
+        "test_binned_4000": f"{prefix}src/datageneration/dataset_4000_train_binned.csv",
+    }
+
+    dataset_map = None
+    is_my_laptop = isMyLaptop()
+    if is_my_laptop:
+        dataset_map = load_dataset("csv", data_files=data_files, streaming=True)
+    else:
+        dataset_map = load_dataset("fahimfarhan/mqtl-classification-datasets", streaming=True)
+
+    train_dataset = PagingMQTLDataset(someDataset=dataset_map[f"train_binned_{window}"],
+                                    bertTokenizer=tokenizer,
+                                    seqLength=window,
+                                    splitSequenceRequired=splitSequenceRequired
+                                    )
+    val_dataset = PagingMQTLDataset(dataset_map[f"validate_binned_{window}"],
+                                  bertTokenizer=tokenizer,
+                                  seqLength=window,
+                                  splitSequenceRequired=splitSequenceRequired
+                                  )
+    test_dataset = PagingMQTLDataset(dataset_map[f"test_binned_{window}"],
+                                   bertTokenizer=tokenizer,
+                                   seqLength=window,
+                                   splitSequenceRequired=splitSequenceRequired
+                                   )
+    return train_dataset, val_dataset, test_dataset

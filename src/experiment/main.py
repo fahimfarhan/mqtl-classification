@@ -22,7 +22,7 @@ import huggingface_hub
 from huggingface_hub import HfApi
 import numpy as np
 import wandb
-from datasets import load_dataset, Dataset
+from datasets import load_dataset, Dataset, DatasetDict
 from dotenv import load_dotenv
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, roc_auc_score
 from torch.utils.data import IterableDataset
@@ -193,13 +193,18 @@ class PagingMQTLDataset(IterableDataset):
             someDataset: Dataset,
             bertTokenizer: BertTokenizer,
             seqLength: int,
-            splitSequenceRequired: bool
+            splitSequenceRequired: bool,
+            datasetLen: int
         ):
         self.someDataset = someDataset
         self.bertTokenizer = bertTokenizer
         self.seqLength = seqLength
         self.splitSequenceRequired = splitSequenceRequired
+        self.datasetLen=datasetLen
         pass
+
+    # def __len__(self):
+    #     return self.datasetLen
 
     def __iter__(self):
         for row in self.someDataset:
@@ -261,6 +266,42 @@ def signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases():
         print(f"Error during wand db Face login: {e}")
     pass
 
+def get_dataset_length(dataset_name=None, split=None, local_path=None):
+    try:
+        if local_path:
+            dataset = load_dataset("csv", data_files={split: local_path}, split=split, streaming=False)
+        else:
+            dataset = load_dataset(dataset_name, split=split, streaming=False)
+        return len(dataset)
+    except Exception as e:
+        print(f"Error while loading length for {split}: {e}")
+        return None
+
+def createSinglePagingDatasets(
+        data_files,
+        split,
+        tokenizer,
+        window,
+        splitSequenceRequired
+) -> PagingMQTLDataset:  # I can't come up with creative names
+    is_my_laptop = isMyLaptop()
+    if is_my_laptop:
+        dataset_map = load_dataset("csv", data_files=data_files, streaming=True)
+        dataset_len = get_dataset_length(local_path=data_files[split], split=split)
+    else:
+        dataset_map = load_dataset("fahimfarhan/mqtl-classification-datasets", streaming=True)
+        dataset_len = get_dataset_length(dataset_name="fahimfarhan/mqtl-classification-datasets", split=split)
+
+    print(f"{split = } ==> {dataset_len = }")
+    return PagingMQTLDataset(
+        someDataset=dataset_map[f"train_binned_{window}"],
+        bertTokenizer=tokenizer,
+        seqLength=window,
+        splitSequenceRequired=splitSequenceRequired,
+        datasetLen = dataset_len
+    )
+
+
 def createPagingTrainValTestDatasets(tokenizer, window, splitSequenceRequired) -> (PagingMQTLDataset, PagingMQTLDataset, PagingMQTLDataset):
     prefix = "/home/gamegame/PycharmProjects/mqtl-classification/"
     data_files = {
@@ -270,37 +311,22 @@ def createPagingTrainValTestDatasets(tokenizer, window, splitSequenceRequired) -
         "test_binned_200": f"{prefix}src/datageneration/dataset_200_test_binned.csv",
         # medium samples
         "train_binned_1000": f"{prefix}src/datageneration/dataset_1000_train_binned.csv",
-        "validate_binned_1000": f"{prefix}src/datageneration/dataset_1000_train_binned.csv",
-        "test_binned_1000": f"{prefix}src/datageneration/dataset_1000_train_binned.csv",
+        "validate_binned_1000": f"{prefix}src/datageneration/dataset_1000_validate_binned.csv",
+        "test_binned_1000": f"{prefix}src/datageneration/dataset_1000_test_binned.csv",
 
         # large samples
         "train_binned_4000": f"{prefix}src/datageneration/dataset_4000_train_binned.csv",
-        "validate_binned_4000": f"{prefix}src/datageneration/dataset_4000_train_binned.csv",
-        "test_binned_4000": f"{prefix}src/datageneration/dataset_4000_train_binned.csv",
+        "validate_binned_4000": f"{prefix}src/datageneration/dataset_4000_validate_binned.csv",
+        "test_binned_4000": f"{prefix}src/datageneration/dataset_4000_test_binned.csv",
     }
 
-    dataset_map = None
-    is_my_laptop = isMyLaptop()
-    if is_my_laptop:
-        dataset_map = load_dataset("csv", data_files=data_files, streaming=True)
-    else:
-        dataset_map = load_dataset("fahimfarhan/mqtl-classification-datasets", streaming=True)
+    # not sure if this is a good idea. if anything goes wrong, revert back to previous code of this function
+    train_dataset = createSinglePagingDatasets(data_files, f"train_binned_{window}", tokenizer, window, splitSequenceRequired)
 
-    train_dataset = PagingMQTLDataset(someDataset=dataset_map[f"train_binned_{window}"],
-                                    bertTokenizer=tokenizer,
-                                    seqLength=window,
-                                    splitSequenceRequired=splitSequenceRequired
-                                    )
-    val_dataset = PagingMQTLDataset(dataset_map[f"validate_binned_{window}"],
-                                  bertTokenizer=tokenizer,
-                                  seqLength=window,
-                                  splitSequenceRequired=splitSequenceRequired
-                                  )
-    test_dataset = PagingMQTLDataset(dataset_map[f"test_binned_{window}"],
-                                   bertTokenizer=tokenizer,
-                                   seqLength=window,
-                                   splitSequenceRequired=splitSequenceRequired
-                                   )
+    val_dataset =createSinglePagingDatasets(data_files, f"validate_binned_{window}", tokenizer, window, splitSequenceRequired)
+
+    test_dataset = createSinglePagingDatasets(data_files, f"test_binned_{window}", tokenizer, window, splitSequenceRequired)
+
     return train_dataset, val_dataset, test_dataset
 
 
@@ -362,22 +388,25 @@ def computeMetricsUsingSkLearn(args):
 
 """ dynamic section. may be some consts,  changes based on model, etc. Try to keep it as small as possible """
 
-MODEL_NAME = "zhihan1996/DNA_bert_6" # "LongSafari/hyenadna-small-32k-seqlen-hf"
-run_name_prefix = "dna-bert-6-mqtl-classifier" # "hyena-dna-mqtl-classifier"
+MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
+run_name_prefix = "hyena-dna-mqtl-classifier"
+# MODEL_NAME =  "zhihan1996/DNA_bert_6"
+# run_name_prefix = "dna-bert-6-mqtl-classifier"
+
 run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 run_platform="laptop"
 
 RUN_NAME = f"{run_platform}-{run_name_prefix}-{run_name_suffix}"
-SPLIT_SEQUENCE_REQUIRED=True          # False
-WINDOW = 1000  # use 200 on your local pc.
+SPLIT_SEQUENCE_REQUIRED= (MODEL_NAME != "LongSafari/hyenadna-small-32k-seqlen-hf")
+WINDOW = 200  # use 200 on your local pc.
 
 SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}-{WINDOW}"
 SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}-{WINDOW}"
 
 
-NUM_ROWS = 20 # 20_000    # hardcoded value
+NUM_ROWS = 1_000    # hardcoded value
 PER_DEVICE_BATCH_SIZE = getDynamicBatchSize()
-EPOCHS = 3
+EPOCHS = 2
 NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
 
 effective_batch_size = PER_DEVICE_BATCH_SIZE * NUM_GPUS
