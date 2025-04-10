@@ -203,8 +203,8 @@ class PagingMQTLDataset(IterableDataset):
         self.datasetLen=datasetLen
         pass
 
-    # def __len__(self):
-    #     return self.datasetLen
+    def __len__(self):
+        return self.datasetLen
 
     def __iter__(self):
         for row in self.someDataset:
