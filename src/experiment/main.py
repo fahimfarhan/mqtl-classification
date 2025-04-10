@@ -25,10 +25,11 @@ import wandb
 from datasets import load_dataset, Dataset, DatasetDict
 from dotenv import load_dotenv
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, roc_auc_score
-from torch.utils.data import IterableDataset
+from torch.utils.data import IterableDataset, get_worker_info
 from transformers import BertTokenizer, BatchEncoding, AutoTokenizer, \
     AutoModelForSequenceClassification, AutoConfig, TrainingArguments, Trainer, DataCollatorWithPadding
 import torch
+import warnings
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # hyena dna requires this
 print("import dependencies completed")
@@ -206,8 +207,28 @@ class PagingMQTLDataset(IterableDataset):
     def __len__(self):
         return self.datasetLen
 
+    def createShardDatasetForMultipleGpus(self):
+        worker_info = get_worker_info()
+
+        rank = int(os.environ.get("RANK", 0))
+        world_size = int(os.environ.get("WORLD_SIZE", 1))
+
+        # Total shards = world_size * num_workers (or 1 if no workers)
+        num_workers = worker_info.num_workers if worker_info is not None else 1
+        worker_id = worker_info.id if worker_info is not None else 0
+
+        timber.info(f"{num_workers = }, {worker_id = }, {rank = }, {world_size=}")
+
+        total_shards = world_size * num_workers
+        shard_index = rank * num_workers + worker_id
+        # Shard the dataset accordingly
+        shard_dataset = self.someDataset.shard(num_shards=total_shards, index=shard_index)
+        return shard_dataset
+
     def __iter__(self):
-        for row in self.someDataset:
+        shardDataset = self.createShardDatasetForMultipleGpus()
+
+        for row in shardDataset:
             processed = self.preprocess(row)
             if processed is not None:
                 yield processed
@@ -385,6 +406,15 @@ def computeMetricsUsingSkLearn(args):
     #    timber.error(f"compute_metrics_using_sklearn failed with exception: {x}")
     #    return {"accuracy": 0, "roc_auc": 0, "precision": 0, "recall": 0, "f1": 0}
 
+def disableAnnoyingWarnings():
+    # Caution! if anything goes wrong, enable it. make sure this warning related issue ain't the culprit!
+    warnings.filterwarnings(
+        "ignore",
+        message="Length of IterableDataset",
+        category=UserWarning,
+        module="torch.utils.data.dataloader"
+    )
+
 
 """ dynamic section. may be some consts,  changes based on model, etc. Try to keep it as small as possible """
 
@@ -420,6 +450,8 @@ def start():
     timber.info(f"{PER_DEVICE_BATCH_SIZE = }")
 
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+    disableAnnoyingWarnings()
 
     if isMyLaptop():
         wandb.init(mode="offline")  # Logs only locally
