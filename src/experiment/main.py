@@ -493,11 +493,11 @@ def start():
         max_steps=MAX_STEPS,
         weight_decay=0.01,
         learning_rate=1e-3,
-        logging_dir="./logs",
+        logging_dir="./tensorboard/logs",
         save_safetensors=False,
         gradient_checkpointing=True,  # to prevent out of memory error
         fp16=True,  # to train faster
-        report_to="wandb"
+        report_to=["tensorboard", "wandb"],  # <-- add both
     )
 
     dataCollator = DataCollatorWithPadding(tokenizer=mainTokenizer)
@@ -529,13 +529,13 @@ def start():
         commit_message = f":tada: Push {RUN_NAME} model for window size {WINDOW} from huggingface space"
         if is_my_laptop:
             commit_message = f":tada: Push {RUN_NAME} model for window size {WINDOW} from my laptop"
-
-        mainModel.push_to_hub(
-            repo_id=SAVE_MODEL_IN_REMOTE_REPOSITORY,
-            # subfolder=f"my-awesome-model-{WINDOW}", subfolder didn't work :/
-            commit_message=commit_message,  # f":tada: Push model for window size {WINDOW}"
-            safe_serialization=False
-        )
+        if not is_my_laptop:
+            mainModel.push_to_hub(
+                repo_id=SAVE_MODEL_IN_REMOTE_REPOSITORY,
+                # subfolder=f"my-awesome-model-{WINDOW}", subfolder didn't work :/
+                commit_message=commit_message,  # f":tada: Push model for window size {WINDOW}"
+                safe_serialization=False
+            )
 
     test_results = trainer.evaluate(eval_dataset=test_dataset)
     try:
