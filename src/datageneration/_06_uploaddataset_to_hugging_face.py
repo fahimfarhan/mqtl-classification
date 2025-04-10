@@ -10,11 +10,14 @@ if __name__ == "__main__":
     "train_binned_1000": "dataset_1000_train_binned.csv",
     "validate_binned_1000": "dataset_1000_validate_binned.csv",
     "test_binned_1000": "dataset_1000_test_binned.csv",
+    # medium samples
+    "train_binned_2000": "dataset_2000_train_binned.csv",
+    "validate_binned_2000": "dataset_2000_validate_binned.csv",
+    "test_binned_2000": "dataset_2000_test_binned.csv",
     # large samples
     "train_binned_4000": "dataset_4000_train_binned.csv",
     "validate_binned_4000": "dataset_4000_validate_binned.csv",
     "test_binned_4000": "dataset_4000_test_binned.csv",
-
   }
   dataset = load_dataset("csv", data_files=data_files)
 

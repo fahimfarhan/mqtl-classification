@@ -334,7 +334,10 @@ def createPagingTrainValTestDatasets(tokenizer, window, splitSequenceRequired) -
         "train_binned_1000": f"{prefix}src/datageneration/dataset_1000_train_binned.csv",
         "validate_binned_1000": f"{prefix}src/datageneration/dataset_1000_validate_binned.csv",
         "test_binned_1000": f"{prefix}src/datageneration/dataset_1000_test_binned.csv",
-
+        # medium samples
+        "train_binned_2000": f"{prefix}src/datageneration/dataset_2000_train_binned.csv",
+        "validate_binned_2000": f"{prefix}src/datageneration/dataset_2000_validate_binned.csv",
+        "test_binned_2000": f"{prefix}src/datageneration/dataset_2000_test_binned.csv",
         # large samples
         "train_binned_4000": f"{prefix}src/datageneration/dataset_4000_train_binned.csv",
         "validate_binned_4000": f"{prefix}src/datageneration/dataset_4000_validate_binned.csv",

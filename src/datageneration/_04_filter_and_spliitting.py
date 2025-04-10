@@ -27,8 +27,8 @@ if __name__ == "__main__":
     file_suffix = "_binned"
     for i in range(1, 23):
       # print(f"chrom{i}")
-      tmp_pos = df[(df["chrom"] == f"chr{i}") & (df["label"] == 1)].head(1000)  # limit(1000)
-      tmp_neg = df[(df["chrom"] == f"chr{i}") & (df["label"] == 0)].head(1000)  # limit(1000)
+      tmp_pos = df[(df["chrom"] == f"chr{i}") & (df["label"] == 1)].head(HALF_OF_BINNING_SIZE)  # limit(1000)
+      tmp_neg = df[(df["chrom"] == f"chr{i}") & (df["label"] == 0)].head(HALF_OF_BINNING_SIZE)  # limit(1000)
       # print(f"chr{i} -> {tmp['chrom'] = }")
       list_of_dfs.append(tmp_pos)
       list_of_dfs.append(tmp_neg)
