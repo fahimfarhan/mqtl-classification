@@ -204,4 +204,7 @@ logs/
 *.lock
 
 # ignore wandb files
-*.wandb
+*.wandb/
+
+# Ignore W&B logs
+wandb/

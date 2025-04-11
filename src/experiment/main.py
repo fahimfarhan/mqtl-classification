@@ -431,13 +431,13 @@ run_platform="laptop"
 
 RUN_NAME = f"{run_platform}-{run_name_prefix}-{run_name_suffix}"
 SPLIT_SEQUENCE_REQUIRED= (MODEL_NAME != "LongSafari/hyenadna-small-32k-seqlen-hf")
-WINDOW = 200  # use 200 on your local pc.
+WINDOW = 2000  # use 200 on your local pc.
 
 SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}-{WINDOW}"
 SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}-{WINDOW}"
 
 
-NUM_ROWS = 1_000    # hardcoded value
+NUM_ROWS = 1_00    # hardcoded value
 PER_DEVICE_BATCH_SIZE = getDynamicBatchSize()
 EPOCHS = 2
 NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
@@ -551,5 +551,17 @@ if __name__ == "__main__":
     # for some reason, the variables in the main function act like global variables in python
     # hence other functions get confused with the "global" variables. easiest solution, write everything
     # in another function (say, start()), and call it inside the main
+    start_time = datetime.now()
+
     start()
+
+    end_time = datetime.now()
+    execution_time = end_time - start_time
+    total_seconds = execution_time.total_seconds()
+
+    # Convert total seconds into hours, minutes, and seconds
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    print(f"Execution time: {int(hours)}h {int(minutes)}m {seconds:.2f}s")
     pass
