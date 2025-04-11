@@ -40,3 +40,24 @@ def createPagingTrainValTestDatasets(tokenizer, window, splitSequenceRequired) -
                                    splitSequenceRequired=splitSequenceRequired
                                    )
     return train_dataset, val_dataset, test_dataset
+
+
+
+class MqtlTrainer(Trainer):
+    """
+    Extending trainer to detect 1. anomalies, and 2. clip the gradients
+    for debugging purposes. if the default trainer works, stick to defaults...
+    """
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        torch.autograd.set_detect_anomaly(True)
+        return super().compute_loss(model, inputs, return_outputs, num_items_in_batch)
+
+    # def training_step(self, model, inputs, num_items_in_batch=None):
+    #     model.train()
+    #     inputs = self._prepare_inputs(inputs)
+    #     with self.compute_loss_context_manager():
+    #         loss = self.compute_loss(model, inputs, num_items_in_batch=num_items_in_batch)
+    #     loss.backward()
+    #     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # <=== gradient clipping
+    #     return loss.detach()

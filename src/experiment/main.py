@@ -237,6 +237,10 @@ class PagingMQTLDataset(IterableDataset):
         sequence = row["sequence"]
         label = row["label"]
 
+        # Basic validity check
+        if (sequence is None) or (label is None):  # it looks like there's a needle in the haystack.
+            return None
+
         if len(sequence) != self.seqLength:
             return None  # skip a few problematic rows
 
@@ -437,9 +441,9 @@ SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}-{WINDOW}"
 SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}-{WINDOW}"
 
 
-NUM_ROWS = 1_00    # hardcoded value
+NUM_ROWS = 2_000    # hardcoded value
 PER_DEVICE_BATCH_SIZE = getDynamicBatchSize()
-EPOCHS = 2
+EPOCHS = 1
 NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
 
 effective_batch_size = PER_DEVICE_BATCH_SIZE * NUM_GPUS
@@ -496,7 +500,7 @@ def start():
         logging_dir="./tensorboard/logs",
         save_safetensors=False,
         gradient_checkpointing=True,  # to prevent out of memory error
-        fp16=True,  # to train faster
+        # fp16=True,  # to train faster # commenting out cz gradient exploding to NaN
         report_to=["tensorboard", "wandb"],  # <-- add both
     )
 
