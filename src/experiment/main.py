@@ -424,6 +424,7 @@ def disableAnnoyingWarnings():
 
 
 """ dynamic section. may be some consts,  changes based on model, etc. Try to keep it as small as possible """
+""" THIS IS THE MOST IMPORTANT PART """
 
 MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
 run_name_prefix = "hyena-dna-mqtl-classifier"
@@ -449,6 +450,8 @@ NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
 effective_batch_size = PER_DEVICE_BATCH_SIZE * NUM_GPUS
 STEPS_PER_EPOCH = NUM_ROWS // effective_batch_size
 MAX_STEPS = EPOCHS * STEPS_PER_EPOCH
+
+print("init arguments completed")
 
 """ main """
 def start():
