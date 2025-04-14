@@ -475,6 +475,11 @@ def start():
     mainTokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
     mainModel = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, trust_remote_code=True, num_labels=2)
 
+    print(f"{type(config) = }")
+    print(f"{type(mainModel.config) = }")
+
+    assert type(config) == type(mainModel.config), f"Config type mismatch: {type(config)} != {type(mainModel.config)}"
+
     isGpuAvailable = torch.cuda.is_available()
     if isGpuAvailable:
         mainModel = mainModel.to("cuda")  # not sure if it is necessary in the kaggle / huggingface virtual-machine

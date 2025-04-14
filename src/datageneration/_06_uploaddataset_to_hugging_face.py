@@ -3,6 +3,10 @@ from datasets import load_dataset, DatasetDict
 if __name__ == "__main__":
   data_files = {
     # small samples
+    "train_binned_100": "dataset_100_train_binned.csv",
+    "validate_binned_100": "dataset_100_validate_binned.csv",
+    "test_binned_100": "dataset_100_test_binned.csv",
+
     "train_binned_200": "dataset_200_train_binned.csv",
     "validate_binned_200": "dataset_200_validate_binned.csv",
     "test_binned_200": "dataset_200_test_binned.csv",

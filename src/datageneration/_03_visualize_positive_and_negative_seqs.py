@@ -7,7 +7,7 @@ if __name__ == '__main__':
   negatives = pd.read_csv(f"negatives_{WINDOW}.csv", index_col=0)
 
   grelu.visualize.plot_gc_match(
-    positives=negatives, negatives=negatives, binwidth=0.02, genome="hg38", figsize=(4, 3)
+    positives=positives, negatives=negatives, binwidth=0.02, genome="hg38", figsize=(4, 3)
   ).show()
   pass
 

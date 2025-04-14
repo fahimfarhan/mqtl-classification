@@ -56,7 +56,7 @@ def start():
     genome=genome,
     chroms="autosomes",  # negative regions will also be chosen from autosomes
     # gc_bw_file='gc_hg38_2114.bw',
-    blacklist=genome,  # negative regions overlapping the blacklist will be dropped
+    blacklist=None,  # negative regions overlapping the blacklist will be dropped
     seed=0,
   )
   print("--------- negative head -------------")
