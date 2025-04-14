@@ -7,17 +7,8 @@ from datasets import Dataset
 from transformers import AutoConfig, AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, \
     DataCollatorWithPadding, Trainer, BertTokenizer, BatchEncoding
 
-from src.experiment.main import computeMetricsUsingTorchEvaluate, PagingMQTLDataset
-
-MODEL_NAME =  "zhihan1996/DNA_bert_6"
-run_name_prefix = "dna-bert-6-mqtl-classifier"
-
-run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-run_platform="laptop"
-
-RUN_NAME = f"{run_platform}-{run_name_prefix}-{run_name_suffix}"
-SPLIT_SEQUENCE_REQUIRED= (MODEL_NAME != "LongSafari/hyenadna-small-32k-seqlen-hf")
-WINDOW = 2000  # use 200 on your local pc.
+from src.experiment.main import computeMetricsUsingTorchEvaluate, PagingMQTLDataset, WINDOW, MODEL_NAME, \
+    SPLIT_SEQUENCE_REQUIRED
 
 
 # def checkIfLabelsAreOk() # from manual inspection, ok.
@@ -117,6 +108,9 @@ def overfit10SamplesCheck():
         print(f"{x = }")
 
     print("--------- Evaluation start ----------")
+
+    for item in tinyPagingDf:
+        print(item)
 
     test_results = trainer.evaluate(eval_dataset=tinyPagingDf)
     print(f"{test_results = }")
@@ -306,9 +300,9 @@ def preprocessingForDnaBert6():
     pass
 
 if __name__ == '__main__':
-    # overfit10SamplesCheck()
+    overfit10SamplesCheck()
     # preprocessingForDnaBert6()
-    howIsTokenizerWorking()
+    # howIsTokenizerWorking()
     pass
 
 """

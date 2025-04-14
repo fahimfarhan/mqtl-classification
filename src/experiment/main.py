@@ -104,16 +104,29 @@ def sequenceEncodePlusForHyenaDna(
     batchEncodingDict: BatchEncoding = BatchEncoding(encoded_map)
     return batchEncodingDict
 
+def toKmerSequence(seq: str, k: int=6) -> str:
+    """
+    :param seq:  ATCGTTCAATCGTTCA.........
+    :param k: 6
+    :return: ATCGTT CAATCG TTCA.. ...... ......
+    """
+
+    output = ""
+    for i in range(len(seq) - k + 1):
+        output = output + seq[i:i + k] + " "
+    return output
+
 # for dnaBert. it cannot process longer sequences...
-def sequenceEncodePlusWithSplitting(
+def sequenceEncodePlusForDnaBert6(
         tokenizer: BertTokenizer,
-        sequence: str,
+        seq: str,
         label: int
 ) -> BatchEncoding:
     max_size = 512
+    kmerSeq = toKmerSequence(seq, k=6)
 
     tempMap: BatchEncoding = tokenizer.encode_plus(
-        sequence,
+        kmerSeq,
         add_special_tokens=False,  # we'll add the special tokens manually in the for loop below
         return_attention_mask=True,
         return_tensors="pt"
@@ -183,7 +196,7 @@ def sequenceEncodePlusCompact(
         label: int
 ) -> BatchEncoding:
     if splitSequence:
-        return sequenceEncodePlusWithSplitting(tokenizer, sequence, label)
+        return sequenceEncodePlusForDnaBert6(tokenizer, sequence, label)
     else:
         return sequenceEncodePlusForHyenaDna(tokenizer, sequence, label)
 
@@ -426,10 +439,10 @@ def disableAnnoyingWarnings():
 """ dynamic section. may be some consts,  changes based on model, etc. Try to keep it as small as possible """
 """ THIS IS THE MOST IMPORTANT PART """
 
-MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
-run_name_prefix = "hyena-dna-mqtl-classifier"
-# MODEL_NAME =  "zhihan1996/DNA_bert_6"
-# run_name_prefix = "dna-bert-6-mqtl-classifier"
+# MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
+# run_name_prefix = "hyena-dna-mqtl-classifier"
+MODEL_NAME =  "zhihan1996/DNA_bert_6"
+run_name_prefix = "dna-bert-6-mqtl-classifier"
 
 run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 run_platform="laptop"
