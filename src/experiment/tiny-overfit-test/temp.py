@@ -76,7 +76,7 @@ def overfit10SamplesCheck():
 
     # Keep batch size small if needed (even 1 works)
     trainingArgs = TrainingArguments(
-        output_dir="tiny-overfit-test",
+        output_dir="",
         per_device_train_batch_size=2,
         per_device_eval_batch_size=2,
         max_steps=1000,  # a few hundred is often enough to overfit
