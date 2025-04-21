@@ -247,7 +247,7 @@ def start():
     dnaTokenizer = BertTokenizer.from_pretrained(model_name, trust_remote_code=True)
     someConfig = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
     someConfig.split = 7  # hmm. so it works upto 7 on my laptop. if 8, then OutOfMemoryError
-    mainModel = BertForLongSequenceClassification(someConfig)
+    mainModel = BertForLongSequenceClassification.from_pretrained(model_name, config=someConfig, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
 
     print(mainModel)
 
@@ -261,9 +261,9 @@ def start():
     print(f"CLS token ID: {tokenizer.cls_token_id} => {tokenizer.cls_token}")
     print(f"SEP token ID: {tokenizer.sep_token_id} => {tokenizer.sep_token}")
 
-    exit(0)
+    # exit(0)
 
-    df = pd.read_csv("temp_sample.csv")
+    df = pd.read_csv("/home/gamegame/PycharmProjects/mqtl-classification/src/experiment/tiny-overfit-test/temp_sample.csv")
     df = Dataset.from_pandas(df)
     print(df)
 
@@ -381,7 +381,7 @@ def start():
     # exit(0)
     # Keep batch size small if needed (even 1 works)
     trainingArgs = TrainingArguments(
-        output_dir="",
+        output_dir="demo",
         per_device_train_batch_size=2,
         per_device_eval_batch_size=2,
         max_steps=1000,  # a few hundred is often enough to overfit
