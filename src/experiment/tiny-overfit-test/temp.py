@@ -8,7 +8,7 @@ from transformers import AutoConfig, AutoTokenizer, AutoModelForSequenceClassifi
     DataCollatorWithPadding, Trainer, BertTokenizer, BatchEncoding
 
 from src.experiment.main import computeMetricsUsingTorchEvaluate, PagingMQTLDataset, WINDOW, MODEL_NAME, \
-    SPLIT_SEQUENCE_REQUIRED
+    CONVERT_TO_KMER
 
 
 # def checkIfLabelsAreOk() # from manual inspection, ok.
@@ -70,7 +70,7 @@ def overfit10SamplesCheck():
         someDataset=tiny_ds,
         bertTokenizer=mainTokenizer,
         seqLength=WINDOW,
-        splitSequenceRequired=SPLIT_SEQUENCE_REQUIRED,
+        toKmer=CONVERT_TO_KMER,
         datasetLen=20
     )
 

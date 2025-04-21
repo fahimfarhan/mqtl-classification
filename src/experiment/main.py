@@ -86,24 +86,6 @@ def getGpuName():
     gpu_name = torch.cuda.get_device_name(0).lower()
     return gpu_name
 
-# for hyenaDna. its tokenizer can process longer sequences...
-def sequenceEncodePlusForHyenaDna(
-    tokenizer: BertTokenizer,
-    sequence: str,
-    label: int
-) -> BatchEncoding:
-    input_ids = tokenizer(sequence)["input_ids"]
-    input_ids: torch.Tensor = torch.Tensor(input_ids)
-    label_tensor = torch.tensor(label)
-    encoded_map: dict = {
-        "input_ids": input_ids.long(),
-        # "attention_mask": attention_mask.int(),    # hyenaDNA does not have attention layer
-        "labels": label_tensor
-    }
-
-    batchEncodingDict: BatchEncoding = BatchEncoding(encoded_map)
-    return batchEncodingDict
-
 def toKmerSequence(seq: str, k: int=6) -> str:
     """
     :param seq:  ATCGTTCAATCGTTCA.........
@@ -116,90 +98,41 @@ def toKmerSequence(seq: str, k: int=6) -> str:
         output = output + seq[i:i + k] + " "
     return output
 
-# for dnaBert. it cannot process longer sequences...
-def sequenceEncodePlusForDnaBert6(
+def dnaSequenceEncodePlus(
         tokenizer: BertTokenizer,
-        seq: str,
-        label: int
+        sequence: str,
+        label: int,
+        toKmer: bool
 ) -> BatchEncoding:
-    max_size = 512
-    kmerSeq = toKmerSequence(seq, k=6)
+    seq = sequence
+    if toKmer:
+        seq = toKmerSequence(sequence)
 
-    tempMap: BatchEncoding = tokenizer.encode_plus(
-        kmerSeq,
-        add_special_tokens=False,  # we'll add the special tokens manually in the for loop below
+    # tokenizedMap = tokenizer(seq)
+    tokenizedMap = tokenizer.encode_plus(
+        seq,
+        add_special_tokens=True,
         return_attention_mask=True,
         return_tensors="pt"
     )
+    input_ids = tokenizedMap["input_ids"]
+    input_ids: torch.Tensor = torch.Tensor(input_ids)
 
-    someInputIds1xN = tempMap["input_ids"]  # shape = 1xN , N = sequence length
-    someMasks1xN = tempMap["attention_mask"]
-    inputIdsList = list(someInputIds1xN[0].split(510))
-    masksList = list(someMasks1xN[0].split(510))
-
-    tmpLength: int = len(inputIdsList)
-
-    for i in range(0, tmpLength):
-        cls: torch.Tensor = torch.Tensor([101])
-        sep: torch.Tensor = torch.Tensor([102])
-
-        isTokenUnitTensor = torch.Tensor([1])
-
-        inputIdsList[i]: torch.Tensor = torch.cat([
-            cls,
-            inputIdsList[i],
-            sep
-        ])
-
-        masksList[i] = torch.cat([
-            isTokenUnitTensor,
-            masksList[i],
-            isTokenUnitTensor
-        ])
-
-
-        pad_len: int = max_size - inputIdsList[i].shape[0]
-        if pad_len > 0:
-            pad: torch.Tensor = torch.Tensor([0] * pad_len)
-
-            inputIdsList[i]: torch.Tensor = torch.cat([
-                inputIdsList[i],
-                pad
-            ])
-
-            masksList[i]: torch.Tensor = torch.cat([
-                masksList[i],
-                pad
-            ])
-
-
-    # so each item len = 512, and the last one may have some padding
-    input_ids: torch.Tensor = torch.stack(inputIdsList).squeeze()  # what's with this squeeze / unsqueeze thing? o.O
-    attention_mask: torch.Tensor = torch.stack(masksList)
     label_tensor = torch.tensor(label)
-
-    # print(f"{input_ids.shape = }")
-
     encoded_map: dict = {
         "input_ids": input_ids.long(),
-        "attention_mask": attention_mask.int(),
+        # "attention_mask": attention_mask.int(),    # hyenaDNA does not have attention layer
         "labels": label_tensor
     }
 
+    # Conditionally add attention_mask if it exists
+    attention_mask = tokenizedMap.get("attention_mask", None)
+    if attention_mask is not None:
+        attention_mask = torch.Tensor(attention_mask)
+        encoded_map["attention_mask"] = attention_mask.int()
+
     batchEncodingDict: BatchEncoding = BatchEncoding(encoded_map)
     return batchEncodingDict
-
-def sequenceEncodePlusCompact(
-        splitSequence: bool,
-        tokenizer: BertTokenizer,
-        sequence: str,
-        label: int
-) -> BatchEncoding:
-    if splitSequence:
-        return sequenceEncodePlusForDnaBert6(tokenizer, sequence, label)
-    else:
-        return sequenceEncodePlusForHyenaDna(tokenizer, sequence, label)
-
 
 class PagingMQTLDataset(IterableDataset):
     def __init__(
@@ -207,13 +140,13 @@ class PagingMQTLDataset(IterableDataset):
             someDataset: Dataset,
             bertTokenizer: BertTokenizer,
             seqLength: int,
-            splitSequenceRequired: bool,
+            toKmer: bool,
             datasetLen: int
         ):
         self.someDataset = someDataset
         self.bertTokenizer = bertTokenizer
         self.seqLength = seqLength
-        self.splitSequenceRequired = splitSequenceRequired
+        self.toKmer = toKmer
         self.datasetLen=datasetLen
         pass
 
@@ -257,7 +190,7 @@ class PagingMQTLDataset(IterableDataset):
         if len(sequence) != self.seqLength:
             return None  # skip a few problematic rows
 
-        return sequenceEncodePlusCompact(self.splitSequenceRequired, self.bertTokenizer, sequence, label)
+        return dnaSequenceEncodePlus(tokenizer = self.bertTokenizer, sequence = sequence, label = label, toKmer=self.toKmer)
 
 def isMyLaptop() -> bool:
     is_my_laptop = os.path.isfile("/home/gamegame/PycharmProjects/mqtl-classification/src/datageneration/dataset_4000_train_binned.csv")
@@ -335,12 +268,12 @@ def createSinglePagingDatasets(
         someDataset=dataset_map[f"train_binned_{window}"],
         bertTokenizer=tokenizer,
         seqLength=window,
-        splitSequenceRequired=splitSequenceRequired,
+        toKmer=splitSequenceRequired,
         datasetLen = dataset_len
     )
 
 
-def createPagingTrainValTestDatasets(tokenizer, window, splitSequenceRequired) -> (PagingMQTLDataset, PagingMQTLDataset, PagingMQTLDataset):
+def createPagingTrainValTestDatasets(tokenizer, window, toKmer) -> (PagingMQTLDataset, PagingMQTLDataset, PagingMQTLDataset):
     prefix = "/home/gamegame/PycharmProjects/mqtl-classification/"
     data_files = {
         # small samples
@@ -362,11 +295,11 @@ def createPagingTrainValTestDatasets(tokenizer, window, splitSequenceRequired) -
     }
 
     # not sure if this is a good idea. if anything goes wrong, revert back to previous code of this function
-    train_dataset = createSinglePagingDatasets(data_files, f"train_binned_{window}", tokenizer, window, splitSequenceRequired)
+    train_dataset = createSinglePagingDatasets(data_files, f"train_binned_{window}", tokenizer, window, toKmer)
 
-    val_dataset =createSinglePagingDatasets(data_files, f"validate_binned_{window}", tokenizer, window, splitSequenceRequired)
+    val_dataset =createSinglePagingDatasets(data_files, f"validate_binned_{window}", tokenizer, window, toKmer)
 
-    test_dataset = createSinglePagingDatasets(data_files, f"test_binned_{window}", tokenizer, window, splitSequenceRequired)
+    test_dataset = createSinglePagingDatasets(data_files, f"test_binned_{window}", tokenizer, window, toKmer)
 
     return train_dataset, val_dataset, test_dataset
 
@@ -448,7 +381,7 @@ run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 run_platform="laptop"
 
 RUN_NAME = f"{run_platform}-{run_name_prefix}-{run_name_suffix}"
-SPLIT_SEQUENCE_REQUIRED= (MODEL_NAME != "LongSafari/hyenadna-small-32k-seqlen-hf")
+CONVERT_TO_KMER= (MODEL_NAME == "zhihan1996/DNA_bert_6")
 WINDOW = 2000  # use 200 on your local pc.
 
 SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}-{WINDOW}"
@@ -498,7 +431,7 @@ def start():
         mainModel = mainModel.to("cuda")  # not sure if it is necessary in the kaggle / huggingface virtual-machine
 
 
-    train_dataset, val_dataset, test_dataset = createPagingTrainValTestDatasets(tokenizer=mainTokenizer, window=WINDOW, splitSequenceRequired=SPLIT_SEQUENCE_REQUIRED)
+    train_dataset, val_dataset, test_dataset = createPagingTrainValTestDatasets(tokenizer=mainTokenizer, window=WINDOW, toKmer=CONVERT_TO_KMER)
 
 
     trainingArgs = TrainingArguments(
