@@ -1,5 +1,8 @@
 import logging
 import os
+
+import evaluate
+import numpy as np
 from datasets import Dataset
 import pandas as pd
 import torch
@@ -7,10 +10,10 @@ from datasets.utils.file_utils import is_remote_url
 from torch import nn
 from torch.nn import MSELoss, CrossEntropyLoss
 from transformers import PreTrainedTokenizer, BertPreTrainedModel, BertTokenizer, TrainingArguments, \
-    DataCollatorWithPadding, Trainer, BatchEncoding, AutoConfig
+    DataCollatorWithPadding, Trainer, BatchEncoding, AutoConfig, AutoModelForSequenceClassification
 from transformers.models.bert.modeling_bert import BERT_START_DOCSTRING, BertModel, BERT_INPUTS_DOCSTRING
 
-from src.experiment.main import computeMetricsUsingTorchEvaluate
+from src.experiment.main import getDynamicGpuDevice
 
 logger = logging.getLogger(__name__)
 
@@ -237,8 +240,45 @@ def toKmerSequence(seq: str, k: int=6) -> str:
     return output
 
 
+class AnomalyDetectTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        torch.autograd.set_detect_anomaly(True)  # 👈 global anomaly detection
+        return super().compute_loss(model, inputs, return_outputs)
 
+# Load metrics
+# global variables. bad practice...
+accuracy_metric = evaluate.load("accuracy")
+f1_metric = evaluate.load("f1")
+roc_auc_metric = evaluate.load("roc_auc")
+precision_metric = evaluate.load("precision")
+recall_metric = evaluate.load("recall")
 
+def computeMetricsTest(args):
+    logits, labels = args
+
+    print(">> logits:", logits)
+    print(">> labels:", labels)
+
+    predictions = np.argmax(logits, axis=1)
+    positive_logits = logits[:, 1]  # <-- Might crash here if logits shape is (N, 1) instead of (N, 2)
+
+    try:
+        accuracy = accuracy_metric.compute(predictions=predictions, references=labels)["accuracy"]
+        f1 = f1_metric.compute(predictions=predictions, references=labels, average="weighted")["f1"]
+        roc_auc = roc_auc_metric.compute(prediction_scores=positive_logits, references=labels)["roc_auc"]
+        precision = precision_metric.compute(predictions=predictions, references=labels, average="weighted")["precision"]
+        recall = recall_metric.compute(predictions=predictions, references=labels, average="weighted")["recall"]
+    except Exception as e:
+        print(f">> Metrics computation failed: {e}")
+        return {}
+
+    return {
+        "accuracy": accuracy,
+        "roc_auc": roc_auc,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1
+    }
 def start():
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # OutOfMemoryError
 
@@ -246,8 +286,9 @@ def start():
 
     dnaTokenizer = BertTokenizer.from_pretrained(model_name, trust_remote_code=True)
     someConfig = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-    someConfig.split = 7  # hmm. so it works upto 7 on my laptop. if 8, then OutOfMemoryError
-    mainModel = BertForLongSequenceClassification.from_pretrained(model_name, config=someConfig, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
+    someConfig.split = 4  # hmm. so it works upto 7 on my laptop. if 8, then OutOfMemoryError
+    # mainModel = BertForLongSequenceClassification.from_pretrained(model_name, config=someConfig, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
+    mainModel = AutoModelForSequenceClassification.from_pretrained(model_name, config=someConfig, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
 
     print(mainModel)
 
@@ -357,26 +398,22 @@ def start():
         return batchEncodingDict
 
     tinyPagingDf = df.map(preprocess)
-    for ithData in tinyPagingDf:
-        print(f"{ithData = }")
-        print(f"{len(ithData['input_ids']) = }")
-        print(f"{(ithData['input_ids']) = }")
+    # for ithData in tinyPagingDf:
+    #     print(f"{ithData = }")
+    #     print(f"{len(ithData['input_ids']) = }")
+    #     print(f"{(ithData['input_ids']) = }")
 
-    sample = tinyPagingDf[0]  # or any ith sample
+    device = getDynamicGpuDevice()
+    sample = tinyPagingDf[0]
+    input_ids = torch.tensor(sample["input_ids"]).unsqueeze(0).to(device)
+    attention_mask = torch.tensor(sample["attention_mask"]).unsqueeze(0).to(device)
+    mainModel = mainModel.to(device)
 
+    with torch.no_grad():
+        output = mainModel(input_ids=input_ids, attention_mask=attention_mask)
+        print(f"Manual logits: {output}")
+    # exit(0)
 
-    inputs = {
-        "input_ids": torch.tensor(sample["input_ids"]).unsqueeze(0),  # Add batch dimension
-        "attention_mask": torch.tensor(sample["attention_mask"]).unsqueeze(0)
-    }
-
-    labels = torch.tensor(sample["labels"]).unsqueeze(0)  # Make it shape (1,) for batch
-
-    outputs = mainModel(**inputs, labels=labels)
-    # loss = outputs.loss
-    # logits = outputs.logits
-
-    print(f"{outputs = }")
 
     # exit(0)
     # Keep batch size small if needed (even 1 works)
@@ -390,30 +427,42 @@ def start():
         logging_steps=10,
         report_to="none",
         save_strategy="no",  # no need to save checkpoints
+
     )
 
     dataCollator = DataCollatorWithPadding(tokenizer=dnaTokenizer)
 
 
     print("create trainer")
-    trainer = Trainer(
+    trainer = AnomalyDetectTrainer(
         model=mainModel,
         args=trainingArgs,
         train_dataset=tinyPagingDf,  # train
+        eval_dataset=tinyPagingDf,
         data_collator=dataCollator,
-        compute_metrics=computeMetricsUsingTorchEvaluate
+        compute_metrics=computeMetricsTest
     )
 
     try:
-    # train, and validate
+        # train, and validate
         trainingResult = trainer.train()
         print("-------Training completed. Results--------\n")
         print(f"{trainingResult = }")
     except Exception as x:
         print(f"{x = }")
 
-    test_results = trainer.evaluate(eval_dataset=tinyPagingDf)
-    print(f"{test_results = }")
+    try:
+        print("\n-------Test Results--------\n")
+        # eval_dataset = Dataset.from_dict(inputs)
+        tinyPagingDf = tinyPagingDf.remove_columns("sequence")
+        tinyPagingDf = tinyPagingDf.remove_columns("label")
+        for item in tinyPagingDf:
+            print(f"item = {item}")
+        test_results = trainer.evaluate(eval_dataset=tinyPagingDf)
+        print(f"{test_results = }")
+    except Exception as x:
+        print(f"{x = }")
+
     pass
 
 if __name__ == '__main__':

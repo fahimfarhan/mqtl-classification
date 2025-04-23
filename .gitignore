@@ -208,3 +208,5 @@ logs/
 
 # Ignore W&B logs
 wandb/
+
+!/src/experiment/tiny-overfit-test/temp_sample.csv

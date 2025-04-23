@@ -38,3 +38,4 @@ wandb
 evaluate
 huggingface_hub[hf_xet]  # sth to do with offline support
 tensorboard
+lightning
