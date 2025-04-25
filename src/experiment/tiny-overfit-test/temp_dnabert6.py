@@ -10,7 +10,7 @@ from datasets.utils.file_utils import is_remote_url
 from torch import nn
 from torch.nn import MSELoss, CrossEntropyLoss
 from transformers import PreTrainedTokenizer, BertPreTrainedModel, BertTokenizer, TrainingArguments, \
-    DataCollatorWithPadding, Trainer, BatchEncoding, AutoConfig, AutoModelForSequenceClassification
+    DataCollatorWithPadding, Trainer, BatchEncoding, AutoConfig, AutoModelForSequenceClassification, AutoModel
 from transformers.models.bert.modeling_bert import BERT_START_DOCSTRING, BertModel, BERT_INPUTS_DOCSTRING
 
 from src.experiment.main import getDynamicGpuDevice
@@ -288,8 +288,11 @@ def start():
     someConfig = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
     someConfig.split = 4  # hmm. so it works upto 7 on my laptop. if 8, then OutOfMemoryError
     # mainModel = BertForLongSequenceClassification.from_pretrained(model_name, config=someConfig, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
-    mainModel = AutoModelForSequenceClassification.from_pretrained(model_name, config=someConfig, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
+    baseModel = AutoModel.from_pretrained(model_name, config=someConfig, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
 
+    someConfig.rnn = "gru" # or "lstm". Let's check if it works
+    mainModel = BertForLongSequenceClassification(someConfig)
+    mainModel.bert = baseModel
     print(mainModel)
 
     # Print token names and their corresponding IDs
@@ -421,7 +424,7 @@ def start():
         output_dir="demo",
         per_device_train_batch_size=2,
         per_device_eval_batch_size=2,
-        max_steps=1000,  # a few hundred is often enough to overfit
+        max_steps=100,  # a few hundred is often enough to overfit
         learning_rate=1e-3,
         logging_dir="./logs",
         logging_steps=10,
