@@ -285,15 +285,26 @@ def start():
     model_name = "zhihan1996/DNA_bert_6"
 
     dnaTokenizer = BertTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    baseModel = AutoModel.from_pretrained(model_name, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
+
+
+    print("-------update some more model configs start-------")
+    baseModel.resize_token_embeddings(len(dnaTokenizer))
+    baseModel.config.max_position_embeddings = 2048
+    baseModel.embeddings.position_embeddings = torch.nn.Embedding(2048, baseModel.config.hidden_size)
+    print(baseModel)
+    print("--------update some more model configs end--------")
+
     someConfig = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
     someConfig.split = 4  # hmm. so it works upto 7 on my laptop. if 8, then OutOfMemoryError
     # mainModel = BertForLongSequenceClassification.from_pretrained(model_name, config=someConfig, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
-    baseModel = AutoModel.from_pretrained(model_name, config=someConfig, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
-
+    someConfig.max_position_embeddings = 2048
     someConfig.rnn = "gru" # or "lstm". Let's check if it works
     mainModel = BertForLongSequenceClassification(someConfig)
     mainModel.bert = baseModel
+
     print(mainModel)
+
 
     # Print token names and their corresponding IDs
     tokenizer = dnaTokenizer
@@ -318,7 +329,12 @@ def start():
         label = row["label"]
 
         kmerSeq = toKmerSequence(sequence)
-        kmerSeqTokenized = dnaTokenizer(kmerSeq)
+        kmerSeqTokenized = dnaTokenizer(
+            kmerSeq,
+            max_length=2048,
+            padding='max_length',
+            return_tensors="pt"
+        )
         input_ids = kmerSeqTokenized["input_ids"]
         attention_mask = kmerSeqTokenized["attention_mask"]
         input_ids: torch.Tensor = torch.Tensor(input_ids)
@@ -408,6 +424,11 @@ def start():
 
     device = getDynamicGpuDevice()
     sample = tinyPagingDf[0]
+
+    print("========tokenization check start=========")
+    print(f"ids to tokens: {tokenizer.convert_ids_to_tokens(sample['input_ids'][0])}")
+    print("========tokenization check end=========")
+
     input_ids = torch.tensor(sample["input_ids"]).unsqueeze(0).to(device)
     attention_mask = torch.tensor(sample["attention_mask"]).unsqueeze(0).to(device)
     mainModel = mainModel.to(device)
@@ -424,12 +445,15 @@ def start():
         output_dir="demo",
         per_device_train_batch_size=2,
         per_device_eval_batch_size=2,
-        max_steps=100,  # a few hundred is often enough to overfit
-        learning_rate=1e-3,
+        max_steps=500,  # a few hundred is often enough to overfit
         logging_dir="./logs",
         logging_steps=10,
         report_to="none",
         save_strategy="no",  # no need to save checkpoints
+
+        learning_rate=5e-5,  # or tune
+        weight_decay=0.0,  # <--- here
+        max_grad_norm=1.0,  # <--- here
 
     )
 
