@@ -19,6 +19,14 @@ from transformers.models.bert.modeling_bert import BERT_START_DOCSTRING, BertMod
 from src.experiment.main import getDynamicGpuDevice
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    roc_auc_score,
+    precision_score,
+    recall_score,
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +260,7 @@ class AnomalyDetectTrainer(Trainer):
 """
 
 
-class MetricsCalculator:
+class MetricsCalculatorFailed:
     def __init__(self):
         self.accuracy_metric = evaluate.load("accuracy")
         self.f1_metric = evaluate.load("f1")
@@ -297,6 +305,45 @@ class MetricsCalculator:
         self.logits.clear()
         self.labels.clear()
 
+
+class MetricsCalculator:
+    def __init__(self):
+        self.logits = []
+        self.labels = []
+
+    def update(self, logits: torch.Tensor, labels: torch.Tensor):
+        self.logits.append(logits.detach().cpu())
+        self.labels.append(labels.detach().cpu())
+
+    def compute(self):
+        if not self.logits or not self.labels:
+            return {}
+
+        logits = torch.cat(self.logits).numpy()
+        labels = torch.cat(self.labels).numpy()
+        predictions = np.argmax(logits, axis=1)
+
+        try:
+            positive_logits = logits[:, 1] if logits.shape[1] > 1 else logits[:, 0]
+        except IndexError as e:
+            print("Logit indexing failed:", e)
+            return {}
+
+        try:
+            return {
+                "accuracy": accuracy_score(labels, predictions),
+                "roc_auc": roc_auc_score(labels, positive_logits),
+                "precision": precision_score(labels, predictions, average="weighted", zero_division=0),
+                "recall": recall_score(labels, predictions, average="weighted", zero_division=0),
+                "f1": f1_score(labels, predictions, average="weighted", zero_division=0)
+            }
+        except Exception as e:
+            print(f">> Metrics computation failed: {e}")
+            return {}
+
+    def clear(self):
+        self.logits.clear()
+        self.labels.clear()
 
 class MQTLClassifierModule(pl.LightningModule):
     def __init__(self, model, learning_rate=5e-5, weight_decay=0.0, max_grad_norm=1.0):
@@ -510,7 +557,7 @@ def start():
     print("create trainer")
 
     trainer = pl.Trainer(
-        max_steps=50,
+        max_steps=100,
         log_every_n_steps=10,
         enable_checkpointing=False,  # todo: in real experiment, set it true
         logger=False,
