@@ -161,6 +161,14 @@ class MetricsCalculator:
         self.logits.clear()
         self.labels.clear()
 
+def pretty_print_metrics(metrics: dict, stage: str = ""):
+    metrics_str = f"\n📊 {stage} Metrics:\n" + "\n".join(
+        f"  {k:>15}: {v:.4f}" if v is not None else f"  {k:>15}: N/A"
+        for k, v in metrics.items()
+    )
+    print(metrics_str)
+
+
 class MQTLClassifierModule(pl.LightningModule):
     def __init__(self, model, learning_rate=5e-5, weight_decay=0.0, max_grad_norm=1.0):
         super().__init__()
@@ -173,6 +181,7 @@ class MQTLClassifierModule(pl.LightningModule):
         self.train_metrics = MetricsCalculator()
         self.val_metrics = MetricsCalculator()
         self.test_metrics = MetricsCalculator()
+        pass
 
     def forward(self, batch):
         seqClassifierOutput: SequenceClassifierOutput = self.model(**batch)
@@ -206,8 +215,9 @@ class MQTLClassifierModule(pl.LightningModule):
     def on_train_epoch_end(self) -> None:
         metrics = self.train_metrics.compute()
         self.train_metrics.clear()
-        for k, v in metrics.items():
-            self.log(f"train_{k}", v, prog_bar=True)
+        # for k, v in metrics.items():
+        #     self.log(f"train_{k}", v, prog_bar=True)
+        pretty_print_metrics(metrics, stage="Train")
         pass
 
     def validation_step(self, batch, batch_idx) -> STEP_OUTPUT:
@@ -219,8 +229,9 @@ class MQTLClassifierModule(pl.LightningModule):
     def on_validation_epoch_end(self) -> None:
         metrics = self.val_metrics.compute()
         self.val_metrics.clear()
-        for k, v in metrics.items():
-            self.log(f"eval_{k}", v, prog_bar=True)
+        # for k, v in metrics.items():
+        #     self.log(f"eval_{k}", v, prog_bar=True)
+        pretty_print_metrics(metrics, stage="Eval")
         pass
 
     def test_step(self, batch, batch_idx) -> STEP_OUTPUT:
@@ -232,8 +243,9 @@ class MQTLClassifierModule(pl.LightningModule):
     def on_test_epoch_end(self) -> None:
         metrics = self.test_metrics.compute()
         self.test_metrics.clear()
-        for k, v in metrics.items():
-            self.log(f"test_{k}", v, prog_bar=True)
+        # for k, v in metrics.items():
+        #     self.log(f"test_{k}", v, prog_bar=True)
+        pretty_print_metrics(metrics, stage="Test")
         pass
 
     def configure_optimizers(self):
