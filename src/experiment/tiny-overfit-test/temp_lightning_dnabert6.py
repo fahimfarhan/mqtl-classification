@@ -359,21 +359,31 @@ class MQTLClassifierModule(pl.LightningModule):
         self.test_metrics = MetricsCalculator()
 
     def forward(self, batch):
-        # (loss), logits, (hidden_states), (attentions)
         loss, logits = self.model(**batch)
         return loss, logits
 
     def training_step(self, batch, batch_idx)-> STEP_OUTPUT:
         with torch.autograd.set_detect_anomaly(True):  # Anomaly detection enabled here
-            # print(f"batch_idx = {batch_idx}, batch = {batch}")
             labels = batch["labels"]
             loss, logits = self.forward(batch)
+
+            # Log the loss
+            self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
 
             # Update training metrics
             self.train_metrics.update(logits=logits, labels=labels)
 
             return loss
 
+    def on_after_backward(self):
+        # Compute and log gradient norm
+        total_norm = 0.0
+        for name, param in self.named_parameters():
+            if param.grad is not None:
+                param_norm = param.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+        total_norm = total_norm ** 0.5
+        self.log("grad_norm", total_norm, prog_bar=True, on_step=True, on_epoch=False)
 
     def on_train_epoch_end(self) -> None:
         metrics = self.train_metrics.compute()
@@ -383,14 +393,10 @@ class MQTLClassifierModule(pl.LightningModule):
         pass
 
     def validation_step(self, batch, batch_idx) -> STEP_OUTPUT:
-        # print(f"batch_idx = {batch_idx}, batch = {batch}")
         labels = batch["labels"]
         loss, logits = self.forward(batch)
-        # Update training metrics
         self.val_metrics.update(logits=logits, labels=labels)
-
         return loss
-
 
     def on_validation_epoch_end(self) -> None:
         metrics = self.val_metrics.compute()
@@ -399,15 +405,10 @@ class MQTLClassifierModule(pl.LightningModule):
             self.log(f"eval_{k}", v, prog_bar=True)
         pass
 
-
     def test_step(self, batch, batch_idx) -> STEP_OUTPUT:
-        # print(f"batch_idx = {batch_idx}, batch = {batch}")
         labels = batch["labels"]
         loss, logits = self.forward(batch)
-
-        # Update training metrics
         self.test_metrics.update(logits=logits, labels=labels)
-
         return loss
 
     def on_test_epoch_end(self) -> None:
@@ -427,7 +428,6 @@ class MQTLClassifierModule(pl.LightningModule):
         gradient_clip_val: Optional[Union[int, float]] = None,
         gradient_clip_algorithm: Optional[str] = None,
     ) -> None:
-        # clip gradients manually if needed
         if self.max_grad_norm is not None:
             torch.nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
 
