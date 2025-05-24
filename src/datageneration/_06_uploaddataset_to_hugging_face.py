@@ -2,26 +2,20 @@ from datasets import load_dataset, DatasetDict
 
 if __name__ == "__main__":
   data_files = {
-    # small samples
-    "train_binned_100": "dataset_100_train_binned.csv",
-    "validate_binned_100": "dataset_100_validate_binned.csv",
-    "test_binned_100": "dataset_100_test_binned.csv",
+    # small
+    "train_binned_1029": "dataset_1029_train_binned.csv",
+    "validate_binned_1029": "dataset_1029_validate_binned.csv",
+    "test_binned_1029": "dataset_1029_train_binned.csv",
 
-    "train_binned_200": "dataset_200_train_binned.csv",
-    "validate_binned_200": "dataset_200_validate_binned.csv",
-    "test_binned_200": "dataset_200_test_binned.csv",
-    # medium samples
-    "train_binned_1000": "dataset_1000_train_binned.csv",
-    "validate_binned_1000": "dataset_1000_validate_binned.csv",
-    "test_binned_1000": "dataset_1000_test_binned.csv",
-    # medium samples
-    "train_binned_2000": "dataset_2000_train_binned.csv",
-    "validate_binned_2000": "dataset_2000_validate_binned.csv",
-    "test_binned_2000": "dataset_2000_test_binned.csv",
-    # large samples
-    "train_binned_4000": "dataset_4000_train_binned.csv",
-    "validate_binned_4000": "dataset_4000_validate_binned.csv",
-    "test_binned_4000": "dataset_4000_test_binned.csv",
+    # medium
+    "train_binned_2053": "dataset_1029_train_binned.csv",
+    "validate_binned_2053": "dataset_1029_validate_binned.csv",
+    "test_binned_2053": "dataset_1029_test_binned.csv",
+
+    # large
+    "train_binned_4101": "dataset_1029_train_binned.csv",
+    "validate_binned_4101": "dataset_1029_validate_binned.csv",
+    "test_binned_4101": "dataset_1029_test_binned.csv",
   }
   dataset = load_dataset("csv", data_files=data_files)
 
