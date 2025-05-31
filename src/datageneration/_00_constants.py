@@ -1,27 +1,35 @@
 """
 DNABert6 requires tokenized seq len = multiple of 512
-K mer formula, T = L - k + 1 ==> L = T + k - 1.
-if T = 512 * n, and k = 6, then L = 512 * n + 6 - 1 = 512 * n + 5
+
+Normal kmer formula:  T = L - k + 1 , here T = tokenized length, and L = original length.
+
+BUT the dnabert preprocessor adds 2 special tokens [cls], and [sep]. so, the modified / corrected formula:
+
+    T = L - k + 1 + 2
+    => T = L - k + 3
+    and so L = T + k - 3
+
+if T = 512 * n, and k = 6, then L = 512 * n + 6 - 3 = 512 * n + 3
     T ==> L
-  1024 ==> 1029
-  2048 ==> 2053
-  4096 ==> 4101
+  1024 ==> 1027
+  2048 ==> 2051
+  4096 ==> 4099
 
 and so on.
 """
 HALF_OF_BINNING_SIZE = 500  # so total binned size = 100. 500 positive, and 500 negative sequences.
 
-# # for 1029
-# WINDOW = 1029
-# HALF_WINDOW = WINDOW // 2  # == 514
-# SLIGHTLY_LARGER_WINDOW = WINDOW + 1000
+# # for 1027
+WINDOW = 1027
+HALF_WINDOW = WINDOW // 2  # == 513
+SLIGHTLY_LARGER_WINDOW = WINDOW + 1000
 #
-# for 2053
-# WINDOW = 2053
-# HALF_WINDOW = WINDOW // 2  # == 1026
+# for 2051
+# WINDOW = 2051
+# HALF_WINDOW = WINDOW // 2  # == 1025
 # SLIGHTLY_LARGER_WINDOW = WINDOW + 1000
 
-# # for 4101
-WINDOW = 4101
-HALF_WINDOW = WINDOW // 2  # == 2050
-SLIGHTLY_LARGER_WINDOW = WINDOW + 1000
+# # for 4099
+# WINDOW = 4099
+# HALF_WINDOW = WINDOW // 2  # == 2049
+# SLIGHTLY_LARGER_WINDOW = WINDOW + 1000

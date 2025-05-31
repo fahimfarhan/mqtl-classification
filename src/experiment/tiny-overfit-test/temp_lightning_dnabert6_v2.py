@@ -1,92 +1,36 @@
-"""
-the steps:
-*. load model, tokenizer,
-*. create Datasets object,
-*. init trainer_args object
-*. create custom metrics function
-*. other util functions (dynamic gpu, dynamic batch size, etc)
-*. init, and run trainer object,
-*. run on eval dataset
-* push model to huggingface
-* push weights, & biases to wandb
-* save the kaggle notebook result into github
-"""
+import logging
+import os
+from typing import Any, Optional, Union
 
-""" import dependencies """
-from datetime import datetime
-from typing import Optional, Union
-
-import pytorch_lightning as pl
+import evaluate
+import numpy as np
+from datasets import Dataset
+import pandas as pd
+import torch
+from datasets.utils.file_utils import is_remote_url
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 from torch import nn
 from torch.nn import MSELoss, CrossEntropyLoss
 from torch.optim import AdamW, Optimizer
-from torch.utils.data import DataLoader
-from transformers import BertPreTrainedModel, AutoModel
+from transformers import BertPreTrainedModel, BertTokenizer, \
+    DataCollatorWithPadding, BatchEncoding, AutoConfig, AutoModel
 from transformers.models.bert.modeling_bert import BERT_START_DOCSTRING, BertModel, BERT_INPUTS_DOCSTRING
 
-from src.experiment.Extensions import *
+from src.experiment.main import getDynamicGpuDevice
+import pytorch_lightning as pl
+from torch.utils.data import DataLoader
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    roc_auc_score,
+    precision_score,
+    recall_score,
+)
 
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # hyena dna requires this
-print("import dependencies completed")
+WINDOW = 4096
+SPLIT = WINDOW // 512
 
-""" Common codes """
-class DNaBert6PagingMQTLDataset(PagingMQTLDataset):
-    def preprocess(self, row: dict):
-        sequence = row["sequence"]
-        label = row["label"]
-
-        kmerSeq = toKmerSequence(sequence)
-        kmerSeqTokenized = self.bertTokenizer(
-            kmerSeq,
-            max_length=self.seqLength, # 2048,
-            padding='max_length',
-            return_tensors="pt"
-        )
-        input_ids = kmerSeqTokenized["input_ids"]
-        attention_mask = kmerSeqTokenized["attention_mask"]
-        input_ids: torch.Tensor = torch.Tensor(input_ids)
-        attention_mask = torch.Tensor(attention_mask)
-        label_tensor = torch.tensor(label)
-        encoded_map: dict = {
-            "input_ids": input_ids.long(),
-            "attention_mask": attention_mask.int(),  # hyenaDNA does not have attention layer
-            "labels": label_tensor
-        }
-        return encoded_map
-
-""" dynamic section. may be some consts,  changes based on model, etc. Try to keep it as small as possible """
-""" THIS IS THE MOST IMPORTANT PART """
-
-# MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
-# run_name_prefix = "hyena-dna-mqtl-classifier"
-MODEL_NAME =  "zhihan1996/DNA_bert_6"
-run_name_prefix = "dna-bert-6-mqtl-classifier"
-
-run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-run_platform="laptop"
-
-RUN_NAME = f"{run_platform}-{run_name_prefix}-{run_name_suffix}"
-CONVERT_TO_KMER= (MODEL_NAME == "zhihan1996/DNA_bert_6")
-WINDOW = 2048  # use 200 on your local pc.
-
-SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}-{WINDOW}"
-SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}-{WINDOW}"
-
-
-NUM_ROWS = 2_000    # hardcoded value
-PER_DEVICE_BATCH_SIZE = getDynamicBatchSize()
-EPOCHS = 1
-NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
-
-effective_batch_size = PER_DEVICE_BATCH_SIZE * NUM_GPUS
-STEPS_PER_EPOCH = NUM_ROWS // effective_batch_size
-MAX_STEPS = EPOCHS * STEPS_PER_EPOCH
-
-print("init arguments completed")
-
-""" main """
-
+logger = logging.getLogger(__name__)
 
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
@@ -298,6 +242,118 @@ class BertForLongSequenceClassification(BertPreTrainedModel):
 
         return outputs  # (loss), logits, (hidden_states), (attentions)
 
+def toKmerSequence(seq: str, k: int=6) -> str:
+    """
+    :param seq:  ATCGTTCAATCGTTCA.........
+    :param k: 6
+    :return: ATCGTT CAATCG TTCA.. ...... ......
+    """
+
+    output = ""
+    for i in range(len(seq) - k + 1):
+        output = output + seq[i:i + k] + " "
+    return output
+
+"""    
+class AnomalyDetectTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        torch.autograd.set_detect_anomaly(True)  # 👈 global anomaly detection
+        return super().compute_loss(model, inputs, return_outputs)
+"""
+
+
+class MetricsCalculatorFailed:
+    def __init__(self):
+        self.accuracy_metric = evaluate.load("accuracy")
+        self.f1_metric = evaluate.load("f1")
+        self.roc_auc_metric = evaluate.load("roc_auc")
+        self.precision_metric = evaluate.load("precision")
+        self.recall_metric = evaluate.load("recall")
+
+        self.logits = []
+        self.labels = []
+
+    def update(self, logits: torch.Tensor, labels: torch.Tensor):
+        self.logits.append(logits.detach().cpu())
+        self.labels.append(labels.detach().cpu())
+
+    def compute(self):
+        if not self.logits or not self.labels:
+            return {}
+
+        logits = torch.cat(self.logits).numpy()
+        labels = torch.cat(self.labels).numpy()
+
+        predictions = np.argmax(logits, axis=1)
+        try:
+            positive_logits = logits[:, 1] if logits.shape[1] > 1 else logits[:, 0]
+        except IndexError as e:
+            print("Logit indexing failed:", e)
+            return {}
+
+        try:
+            return {
+                "accuracy": self.accuracy_metric.compute(predictions=predictions, references=labels)["accuracy"],
+                "roc_auc": self.roc_auc_metric.compute(prediction_scores=positive_logits, references=labels)["roc_auc"],
+                "precision": self.precision_metric.compute(predictions=predictions, references=labels, average="weighted")["precision"],
+                "recall": self.recall_metric.compute(predictions=predictions, references=labels, average="weighted")["recall"],
+                "f1": self.f1_metric.compute(predictions=predictions, references=labels, average="weighted")["f1"]
+            }
+        except Exception as e:
+            print(f">> Metrics computation failed: {e}")
+            return {}
+
+    def clear(self):
+        self.logits.clear()
+        self.labels.clear()
+
+
+class MetricsCalculator:
+    def __init__(self):
+        self.logits = []
+        self.labels = []
+
+    def update(self, logits: torch.Tensor, labels: torch.Tensor):
+        self.logits.append(logits.detach().cpu())
+        self.labels.append(labels.detach().cpu())
+
+    def compute(self):
+        if not self.logits or not self.labels:
+            return {}
+
+        logits = torch.cat(self.logits).numpy()
+        labels = torch.cat(self.labels).numpy()
+        predictions = np.argmax(logits, axis=1)
+
+        try:
+            positive_logits = logits[:, 1] if logits.shape[1] > 1 else logits[:, 0]
+        except IndexError as e:
+            print("Logit indexing failed:", e)
+            return {}
+
+        try:
+            return {
+                "accuracy": accuracy_score(labels, predictions),
+                "roc_auc": roc_auc_score(labels, positive_logits),
+                "precision": precision_score(labels, predictions, average="weighted", zero_division=0),
+                "recall": recall_score(labels, predictions, average="weighted", zero_division=0),
+                "f1": f1_score(labels, predictions, average="weighted", zero_division=0)
+            }
+        except Exception as e:
+            print(f">> Metrics computation failed: {e}")
+            return {}
+
+    def clear(self):
+        self.logits.clear()
+        self.labels.clear()
+
+def pretty_print_metrics(metrics: dict, stage: str = ""):
+    metrics_str = f"\n📊 {stage} Metrics:\n" + "\n".join(
+        f"  {k:>15}: {v:.4f}" if v is not None else f"  {k:>15}: N/A"
+        for k, v in metrics.items()
+    )
+    print(metrics_str)
+
 
 class MQTLClassifierModule(pl.LightningModule):
     def __init__(self, model, learning_rate=5e-5, weight_decay=0.0, max_grad_norm=1.0):
@@ -308,9 +364,9 @@ class MQTLClassifierModule(pl.LightningModule):
         self.max_grad_norm = max_grad_norm
         self.criterion = torch.nn.CrossEntropyLoss()
 
-        self.train_metrics = ComputeMetricsUsingSkLearn()
-        self.val_metrics = ComputeMetricsUsingSkLearn()
-        self.test_metrics = ComputeMetricsUsingSkLearn()
+        self.train_metrics = MetricsCalculator()
+        self.val_metrics = MetricsCalculator()
+        self.test_metrics = MetricsCalculator()
 
     def forward(self, batch):
         loss, logits = self.model(**batch)
@@ -390,13 +446,64 @@ class MQTLClassifierModule(pl.LightningModule):
         if self.max_grad_norm is not None:
             torch.nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
 
-class DnaBert6PagingMQTLDataset(PagingMQTLDataset):
-    def preprocess(self, row: dict):
+
+
+def start():
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # OutOfMemoryError
+
+    model_name = "zhihan1996/DNA_bert_6"
+
+    dnaTokenizer = BertTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    baseModel = AutoModel.from_pretrained(model_name, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
+
+
+    print("-------update some more model configs start-------")
+    baseModel.resize_token_embeddings(len(dnaTokenizer))
+    baseModel.config.max_position_embeddings = WINDOW
+    baseModel.embeddings.position_embeddings = torch.nn.Embedding(WINDOW, baseModel.config.hidden_size)
+    print(baseModel)
+    print("--------update some more model configs end--------")
+
+    someConfig = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+    someConfig.split = SPLIT  # hmm. so it works upto 7 on my laptop. if 8, then OutOfMemoryError
+    # mainModel = BertForLongSequenceClassification.from_pretrained(model_name, config=someConfig, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
+    someConfig.max_position_embeddings = WINDOW
+    someConfig.rnn = "gru" # or "lstm". Let's check if it works
+    mainModel = BertForLongSequenceClassification(someConfig)
+    mainModel.bert = baseModel
+
+    print(mainModel)
+
+
+    # Print token names and their corresponding IDs
+    tokenizer = dnaTokenizer
+    token_names = tokenizer.convert_ids_to_tokens(range(tokenizer.vocab_size))
+    for idx, token in enumerate(token_names[:20]):  # Display first 20 tokens for brevity
+        print(f"Token ID {idx}: {token}")
+
+    # Check special tokens
+    print(f"CLS token ID: {tokenizer.cls_token_id} => {tokenizer.cls_token}")
+    print(f"SEP token ID: {tokenizer.sep_token_id} => {tokenizer.sep_token}")
+
+    # exit(0)
+
+    tmp = WINDOW + 6 - 3
+    df = pd.read_csv(f"/home/gamegame/PycharmProjects/mqtl-classification/src/datageneration/_{tmp}_validate_binned.csv")
+
+    filtered_df = df[df['sequence'].str.len() == tmp]
+    filtered_df = filtered_df[["sequence", "label"]]
+
+    df = Dataset.from_pandas(filtered_df.head())
+    print(df)
+
+    print("Check MyDatasets")
+
+    def preprocess(row: dict):
         sequence = row["sequence"]
         label = row["label"]
 
         kmerSeq = toKmerSequence(sequence)
-        kmerSeqTokenized = self.bertTokenizer(
+        kmerSeqTokenized = dnaTokenizer(
             kmerSeq,
             max_length=WINDOW,
             padding='max_length',
@@ -415,168 +522,91 @@ class DnaBert6PagingMQTLDataset(PagingMQTLDataset):
 
         return encoded_map
 
+    tinyPagingDf = df.map(preprocess)
 
-def createSingleDnaBert6PagingDatasets(
-        data_files,
-        split,
-        tokenizer,
-        window,
-        splitSequenceRequired
-) -> DnaBert6PagingMQTLDataset:  # I can't come up with creative names
-    is_my_laptop = isMyLaptop()
-    if is_my_laptop:
-        dataset_map = load_dataset("csv", data_files=data_files, streaming=True)
-        dataset_len = get_dataset_length(local_path=data_files[split], split=split)
-    else:
-        dataset_map = load_dataset("fahimfarhan/mqtl-classification-datasets", streaming=True)
-        dataset_len = get_dataset_length(dataset_name="fahimfarhan/mqtl-classification-datasets", split=split)
+    print(tinyPagingDf.column_names)
+    tinyPagingDf = tinyPagingDf.remove_columns(["sequence", "label"])  # need to drop everything else except what is required (input_ids, attention_masks, etc)
+    # for ithData in tinyPagingDf:
+    #     print(f"{ithData = }")
+    #     print(f"{len(ithData['input_ids']) = }")
+    #     print(f"{(ithData['input_ids']) = }")
 
-    print(f"{split = } ==> {dataset_len = }")
-    return DnaBert6PagingMQTLDataset(
-        someDataset=dataset_map[f"train_binned_{window}"],
-        bertTokenizer=tokenizer,
-        seqLength=window,
-        toKmer=splitSequenceRequired,
-        datasetLen = dataset_len
+    device = getDynamicGpuDevice()
+    sample = tinyPagingDf[0]
+
+    print("========tokenization check start=========")
+    print(f"ids to tokens: {tokenizer.convert_ids_to_tokens(sample['input_ids'][0])}")
+
+    print(f"sample input id 0 size {len(sample['input_ids'][0])}")
+    print(f"sample input id 0 type {type(sample['input_ids'][0])}")
+
+    print("========tokenization check end=========")
+
+    input_ids = torch.tensor(sample["input_ids"]).unsqueeze(0).to(device)
+    attention_mask = torch.tensor(sample["attention_mask"]).unsqueeze(0).to(device)
+    mainModel = mainModel.to(device)
+
+    # with torch.no_grad():
+    #     output = mainModel(input_ids=input_ids, attention_mask=attention_mask)
+    #     print(f"Manual logits: {output}")
+    # exit(0)
+
+
+    # exit(0)
+    # Keep batch size small if needed (even 1 works)
+    """
+    trainingArgs = TrainingArguments(
+        output_dir="demo",
+        per_device_train_batch_size=2,
+        per_device_eval_batch_size=2,
+        max_steps=500,  # a few hundred is often enough to overfit
+        logging_dir="./logs",
+        logging_steps=10,
+        report_to="none",
+        save_strategy="no",  # no need to save checkpoints
+
+        learning_rate=5e-5,  # or tune
+        weight_decay=0.0,  # <--- here
+        max_grad_norm=1.0,  # <--- here
+
     )
-
-def createDnaBert6PagingTrainValTestDatasets(tokenizer, window, toKmer) -> (DnaBert6PagingMQTLDataset, DnaBert6PagingMQTLDataset, DnaBert6PagingMQTLDataset):
-    prefix = "/home/gamegame/PycharmProjects/mqtl-classification/src/datageneration/"
-
-    data_files = {
-        # small
-        "train_binned_1029": f"{prefix}dataset_1029_train_binned.csv",
-        "validate_binned_1029": f"{prefix}dataset_1029_validate_binned.csv",
-        "test_binned_1029": f"{prefix}dataset_1029_train_binned.csv",
-
-        # medium
-        "train_binned_2053": f"{prefix}dataset_1029_train_binned.csv",
-        "validate_binned_2053": f"{prefix}dataset_1029_validate_binned.csv",
-        "test_binned_2053": f"{prefix}dataset_1029_test_binned.csv",
-
-        # large
-        "train_binned_4101": f"{prefix}dataset_1029_train_binned.csv",
-        "validate_binned_4101": f"{prefix}dataset_1029_validate_binned.csv",
-        "test_binned_4101": f"{prefix}dataset_1029_test_binned.csv",
-    }
-
-    # not sure if this is a good idea. if anything goes wrong, revert back to previous code of this function
-    train_dataset = createSingleDnaBert6PagingDatasets(data_files, f"train_binned_{window}", tokenizer, window, toKmer)
-
-    val_dataset =createSingleDnaBert6PagingDatasets(data_files, f"validate_binned_{window}", tokenizer, window, toKmer)
-
-    test_dataset = createSingleDnaBert6PagingDatasets(data_files, f"test_binned_{window}", tokenizer, window, toKmer)
-
-    return train_dataset, val_dataset, test_dataset
-
-
-def start():
-    timber.info(green)
-    timber.info("---Inside start function---")
-    timber.info(f"{PER_DEVICE_BATCH_SIZE = }")
-
-    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-
-    disableAnnoyingWarnings()
-
-    if isMyLaptop():
-        wandb.init(mode="offline")  # Logs only locally
-    else:
-        # datacenter eg huggingface or kaggle.
-        signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases()
-
-
-    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # OutOfMemoryError
-
-    model_name = MODEL_NAME
-
-    dnaTokenizer = BertTokenizer.from_pretrained(model_name, trust_remote_code=True)
-    baseModel = AutoModel.from_pretrained(model_name, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
-    baseModel.gradient_checkpointing_enable()  #  bert model's builtin way to enable gradient check pointing
-
-    print("-------update some more model configs start-------")
-    baseModel.resize_token_embeddings(len(dnaTokenizer))
-    baseModel.config.max_position_embeddings = WINDOW
-    baseModel.embeddings.position_embeddings = torch.nn.Embedding(WINDOW, baseModel.config.hidden_size)
-    print(baseModel)
-    print("--------update some more model configs end--------")
-
-    someConfig = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-    someConfig.split = (WINDOW // 512)  # hmm. so it works upto 7 on my laptop. if 8, then OutOfMemoryError
-    # mainModel = BertForLongSequenceClassification.from_pretrained(model_name, config=someConfig, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
-    someConfig.max_position_embeddings = WINDOW
-    someConfig.rnn = "gru" # or "lstm". Let's check if it works
-    mainModel = BertForLongSequenceClassification(someConfig)
-    mainModel.bert = baseModel
-
-    print(mainModel)
+    """
 
     dataCollator = DataCollatorWithPadding(tokenizer=dnaTokenizer)
 
-    # L = T + k - 1
-    rawSequenceLength = WINDOW + 6 - 1
-    train_dataset, val_dataset, test_dataset = createDnaBert6PagingTrainValTestDatasets(tokenizer=dnaTokenizer, window=rawSequenceLength, toKmer=CONVERT_TO_KMER)
-
-
-    train_loader = DataLoader(train_dataset, batch_size=PER_DEVICE_BATCH_SIZE, shuffle=False, collate_fn=dataCollator) # Can't shuffle the paging/streaming datasets
-    val_loader = DataLoader(val_dataset, batch_size=PER_DEVICE_BATCH_SIZE, shuffle=False, collate_fn=dataCollator)
-    test_loader = DataLoader(test_dataset, batch_size=PER_DEVICE_BATCH_SIZE, shuffle=False, collate_fn=dataCollator)
+    train_loader = DataLoader(tinyPagingDf, batch_size=2, shuffle=True, collate_fn=dataCollator)
+    val_loader = DataLoader(tinyPagingDf, batch_size=2, shuffle=False, collate_fn=dataCollator)
+    test_loader = DataLoader(tinyPagingDf, batch_size=2, shuffle=False, collate_fn=dataCollator)
 
     print("create trainer")
 
-    # todo: reconcile logics
     trainer = pl.Trainer(
-        max_steps=MAX_STEPS,
-        log_every_n_steps=1,
-        enable_progress_bar=True,
-        enable_model_summary=True,
-        val_check_interval=STEPS_PER_EPOCH,
-        check_val_every_n_epoch=None,  # because you're using step-based validation
-        gradient_clip_val=None,  # set if needed to prevent NaNs
-        accumulate_grad_batches=1,
-        precision=32,  # use 16 if fp16 mixed precision is desired
-        default_root_dir="output_checkpoints",
-        enable_checkpointing=True,
-        callbacks=[
-            pl.callbacks.ModelCheckpoint(
-                dirpath="output_checkpoints",
-                save_top_k=-1,
-                every_n_train_steps=500,
-                save_weights_only=False,
-                save_on_train_epoch_end=False,
-            ),
-            pl.callbacks.LearningRateMonitor(logging_interval='step'),
-        ],
-        logger=[
-            pl.loggers.TensorBoardLogger(save_dir="./tensorboard", name="logs"),
-            pl.loggers.WandbLogger(name=RUN_NAME, project="your_project_name"),
-        ],
-        strategy="auto",  # or "ddp" if using multiple GPUs manually
-        # gradient_checkpointing=True, # only available in huggingface trainer for better performance. not lightning ai
+        max_steps=100,
+        log_every_n_steps=10,
+        enable_checkpointing=False,  # todo: in real experiment, set it true
+        logger=False,
+        gradient_clip_val=1.0,
     )
 
     plModule = MQTLClassifierModule(mainModel)
     trainer.fit(plModule, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
     trainer.test(plModule, dataloaders=test_loader)
+    # trainer.test(ckpt_path="best", dataloaders=test_loader) # todo: use this in the real experiment
 
     pass
 
 if __name__ == '__main__':
-    # for some reason, the variables in the main function act like global variables in python
-    # hence other functions get confused with the "global" variables. easiest solution, write everything
-    # in another function (say, start()), and call it inside the main
-    start_time = datetime.now()
-
     start()
-
-    end_time = datetime.now()
-    execution_time = end_time - start_time
-    total_seconds = execution_time.total_seconds()
-
-    # Convert total seconds into hours, minutes, and seconds
-    hours, remainder = divmod(total_seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-
-    print(f"Execution time: {int(hours)}h {int(minutes)}m {seconds:.2f}s")
     pass
+
+"""
+o configure your current shell, you need to source
+the corresponding env file under $HOME/.cargo.
+
+This is usually done by running one of the following (note the leading DOT):
+. "$HOME/.cargo/env"            # For sh/bash/zsh/ash/dash/pdksh
+source "$HOME/.cargo/env.fish"  # For fish
+source "$HOME/.cargo/env.nu"    # For nushell
+
+"""

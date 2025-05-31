@@ -67,8 +67,8 @@ def start():
   negatives["label"] = 0
   negatives["snp.pos"] = -1  # ignore
   negatives["cpg.pos"] = -1  # ignore
-  positives.to_csv(f"positives_{WINDOW}.csv")
-  negatives.to_csv(f"negatives_{WINDOW}.csv")
+  positives.to_csv(f"_{WINDOW}_positives.csv")
+  negatives.to_csv(f"_{WINDOW}_negatives.csv")
 
   combined_dataset = (pd.concat([positives, negatives]))
   combined_dataset = combined_dataset.sort_values("chrom")
@@ -76,7 +76,7 @@ def start():
 
   sequences = extract_intervals_to_seqs(input_df=combined_dataset)
   combined_dataset["sequence"] = sequences
-  combined_dataset.to_csv(f"dataset_{WINDOW}.csv")
+  combined_dataset.to_csv(f"_{WINDOW}_dataset.csv")
   pass
 
 

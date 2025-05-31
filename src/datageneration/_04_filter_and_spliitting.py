@@ -7,7 +7,7 @@ from _00_constants import *
 if __name__ == "__main__":
   start_time = time.time()
 
-  df_unfiltered = pd.read_csv(f"dataset_{WINDOW}.csv")
+  df_unfiltered = pd.read_csv(f"_{WINDOW}_dataset.csv")
 
   df = df_unfiltered.dropna(subset=["sequence"])
   df = df[df["sequence"].notnull()]
@@ -50,9 +50,9 @@ if __name__ == "__main__":
   validate = validate.sample(frac=1)
   test = test.sample(frac=1)
   print(train.head())
-  train.to_csv(f"dataset_{WINDOW}_train{file_suffix}.csv", index=False)
-  validate.to_csv(f"dataset_{WINDOW}_validate{file_suffix}.csv", index=False)
-  test.to_csv(f"dataset_{WINDOW}_test{file_suffix}.csv", index=False)
+  train.to_csv(f"_{WINDOW}_train{file_suffix}.csv", index=False)
+  validate.to_csv(f"_{WINDOW}_validate{file_suffix}.csv", index=False)
+  test.to_csv(f"_{WINDOW}_test{file_suffix}.csv", index=False)
 
   # Record the end time
   end_time = time.time()
