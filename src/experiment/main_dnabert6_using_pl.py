@@ -22,7 +22,7 @@ from torch import nn
 from torch.nn import MSELoss, CrossEntropyLoss
 from torch.optim import AdamW, Optimizer
 from torch.utils.data import DataLoader
-from transformers import BertPreTrainedModel, AutoModel
+from transformers import BertPreTrainedModel, AutoModel, AutoConfig, AutoTokenizer
 from transformers.models.bert.modeling_bert import BERT_START_DOCSTRING, BertModel, BERT_INPUTS_DOCSTRING
 
 from src.experiment.Extensions import *
@@ -470,6 +470,24 @@ def createDnaBert6PagingTrainValTestDatasets(tokenizer, window, toKmer) -> (DnaB
     return train_dataset, val_dataset, test_dataset
 
 
+def save_fine_tuned_model(mainModel):
+    # save the model in huggingface repository, and local storage
+    mainModel.save_pretrained(save_directory=SAVE_MODEL_IN_LOCAL_DIRECTORY, safe_serialization=False)
+    # push to the hub
+    is_my_laptop = isMyLaptop()
+
+    if is_my_laptop:  # no need to save
+        return
+
+    # commit_message = f":tada: Push {RUN_NAME} model for window size {WINDOW} from my laptop"
+    commit_message = f":tada: Push {RUN_NAME} model for window size {WINDOW} into huggingface hub"
+    mainModel.push_to_hub(
+        repo_id=SAVE_MODEL_IN_REMOTE_REPOSITORY,
+        # subfolder=f"my-awesome-model-{WINDOW}", subfolder didn't work :/
+        commit_message=commit_message,
+        safe_serialization=False
+    )
+
 def start():
     timber.info(green)
     timber.info("---Inside start function---")
@@ -549,16 +567,25 @@ def start():
         ],
         logger=[
             pl.loggers.TensorBoardLogger(save_dir="./tensorboard", name="logs"),
-            pl.loggers.WandbLogger(name=RUN_NAME, project="your_project_name"),
+            pl.loggers.WandbLogger(name=RUN_NAME, project="mqtl-classification"),
         ],
         strategy="auto",  # or "ddp" if using multiple GPUs manually
         # gradient_checkpointing=True, # only available in huggingface trainer for better performance. not lightning ai
     )
 
     plModule = MQTLClassifierModule(mainModel)
-    trainer.fit(plModule, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
-    trainer.test(plModule, dataloaders=test_loader)
+    try:
+        trainer.fit(plModule, train_dataloaders=train_loader, val_dataloaders=val_loader)
+    except Exception as x:
+        timber.error(f"Error during training/evaluating: {x}")
+    finally:
+        try:
+            trainer.test(plModule, dataloaders=test_loader)
+        except Exception as e:
+            timber.error(f"Error during testing: {e}")
+
+    save_fine_tuned_model(mainModel=mainModel)
 
     pass
 
