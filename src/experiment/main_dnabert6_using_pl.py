@@ -25,10 +25,44 @@ from torch.utils.data import DataLoader
 from transformers import BertPreTrainedModel, AutoModel, AutoConfig, AutoTokenizer
 from transformers.models.bert.modeling_bert import BERT_START_DOCSTRING, BertModel, BERT_INPUTS_DOCSTRING
 
-from src.experiment.Extensions import *
+try:
+    from src.experiment.Extensions import *
+except ImportError as ie:
+    print(ie)
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # hyena dna requires this
 print("import dependencies completed")
+
+""" dynamic section. may be some consts,  changes based on model, etc. Try to keep it as small as possible """
+""" THIS IS THE MOST IMPORTANT PART """
+
+# MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
+# run_name_prefix = "hyena-dna-mqtl-classifier"
+MODEL_NAME =  "zhihan1996/DNA_bert_6"
+run_name_prefix = "dna-bert-6-mqtl-classifier"
+
+run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M")
+# run_platform="laptop"
+
+RUN_NAME = f"{run_name_prefix}-{run_name_suffix}"
+CONVERT_TO_KMER= (MODEL_NAME == "zhihan1996/DNA_bert_6")
+WINDOW = 1024  # use small window on your laptop gpu (eg nvidia rtx 2k), and large window on datacenter gpu (T4, P100, etc)
+
+SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}-{WINDOW}"
+SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}-{WINDOW}"
+
+NUM_EPOCHS = 1
+NUM_ROWS = 2_000    # hardcoded value
+PER_DEVICE_BATCH_SIZE = getDynamicBatchSize()
+NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
+
+# use it for step based implementation (huggingface trainer library)
+# EPOCHS = 1
+# effective_batch_size = PER_DEVICE_BATCH_SIZE * NUM_GPUS
+# STEPS_PER_EPOCH = NUM_ROWS // effective_batch_size
+# MAX_STEPS = EPOCHS * STEPS_PER_EPOCH
+
+print("init arguments completed")
 
 """ Common codes """
 class DNaBert6PagingMQTLDataset(PagingMQTLDataset):
@@ -55,35 +89,6 @@ class DNaBert6PagingMQTLDataset(PagingMQTLDataset):
         }
         return encoded_map
 
-""" dynamic section. may be some consts,  changes based on model, etc. Try to keep it as small as possible """
-""" THIS IS THE MOST IMPORTANT PART """
-
-# MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
-# run_name_prefix = "hyena-dna-mqtl-classifier"
-MODEL_NAME =  "zhihan1996/DNA_bert_6"
-run_name_prefix = "dna-bert-6-mqtl-classifier"
-
-run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-run_platform="laptop"
-
-RUN_NAME = f"{run_platform}-{run_name_prefix}-{run_name_suffix}"
-CONVERT_TO_KMER= (MODEL_NAME == "zhihan1996/DNA_bert_6")
-WINDOW = 1024  # use 200 on your local pc.
-
-SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}-{WINDOW}"
-SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}-{WINDOW}"
-
-
-NUM_ROWS = 2_000    # hardcoded value
-PER_DEVICE_BATCH_SIZE = getDynamicBatchSize()
-EPOCHS = 1
-NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
-
-effective_batch_size = PER_DEVICE_BATCH_SIZE * NUM_GPUS
-STEPS_PER_EPOCH = NUM_ROWS // effective_batch_size
-MAX_STEPS = EPOCHS * STEPS_PER_EPOCH
-
-print("init arguments completed")
 
 """ main """
 
@@ -542,35 +547,32 @@ def start():
 
     print("create trainer")
 
-    # todo: reconcile logics
     trainer = pl.Trainer(
-        max_steps=MAX_STEPS,
-        log_every_n_steps=1,
+        max_epochs=NUM_EPOCHS,  # instead of max_steps
+        limit_train_batches=None,  # 100% of data each epoch
+        val_check_interval=1.0,  # validate at end of each epoch
         enable_progress_bar=True,
         enable_model_summary=True,
-        val_check_interval=STEPS_PER_EPOCH,
-        check_val_every_n_epoch=None,  # because you're using step-based validation
-        gradient_clip_val=None,  # set if needed to prevent NaNs
+        gradient_clip_val=None,
         accumulate_grad_batches=1,
-        precision=32,  # use 16 if fp16 mixed precision is desired
+        precision=32,
         default_root_dir="output_checkpoints",
         enable_checkpointing=True,
         callbacks=[
             pl.callbacks.ModelCheckpoint(
                 dirpath="output_checkpoints",
                 save_top_k=-1,
-                every_n_train_steps=500,
+                every_n_train_steps=None,
                 save_weights_only=False,
-                save_on_train_epoch_end=False,
+                save_on_train_epoch_end=True,  # save at end of epoch
             ),
-            pl.callbacks.LearningRateMonitor(logging_interval='step'),
+            pl.callbacks.LearningRateMonitor(logging_interval='epoch'),
         ],
         logger=[
-            pl.loggers.TensorBoardLogger(save_dir="./tensorboard", name="logs"),
+            pl.loggers.TensorBoardLogger(save_dir="../experiment/tensorboard", name="logs"),
             pl.loggers.WandbLogger(name=RUN_NAME, project="mqtl-classification"),
         ],
-        strategy="auto",  # or "ddp" if using multiple GPUs manually
-        # gradient_checkpointing=True, # only available in huggingface trainer for better performance. not lightning ai
+        strategy="auto",
     )
 
     plModule = MQTLClassifierModule(mainModel)
@@ -585,14 +587,13 @@ def start():
         except Exception as e:
             timber.error(f"Error during testing: {e}")
 
-    save_fine_tuned_model(mainModel=mainModel)
-
+    try:
+        save_fine_tuned_model(mainModel=mainModel)
+    except Exception as x:
+        timber.error(f"Error during fine-tuning: {x}")
     pass
 
-if __name__ == '__main__':
-    # for some reason, the variables in the main function act like global variables in python
-    # hence other functions get confused with the "global" variables. easiest solution, write everything
-    # in another function (say, start()), and call it inside the main
+def main():
     start_time = datetime.now()
 
     start()
@@ -606,4 +607,11 @@ if __name__ == '__main__':
     minutes, seconds = divmod(remainder, 60)
 
     print(f"Execution time: {int(hours)}h {int(minutes)}m {seconds:.2f}s")
+    pass
+
+if __name__ == '__main__':
+    # for some reason, the variables in the main function act like global variables in python
+    # hence other functions get confused with the "global" variables. easiest solution, write everything
+    # in another function (say, start(), or main()), and call it inside the main
+    main()
     pass

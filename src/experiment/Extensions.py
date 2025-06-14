@@ -145,43 +145,46 @@ def isMyLaptop() -> bool:
     return is_my_laptop
 
 def signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases():
-    # Load the .env file, but don't crash if it's not found (e.g., in Hugging Face Space)
+    # Try to import kaggle_secrets only if available (i.e., on Kaggle)
     try:
-        load_dotenv()  # Only useful on your laptop if .env exists
-        print(".env file loaded successfully.")
-    except Exception as e:
-        print(f"Warning: Could not load .env file. Exception: {e}")
+        from kaggle_secrets import UserSecretsClient
+        IS_KAGGLE = True
+    except ImportError:
+        IS_KAGGLE = False
 
-    # Try to get the token from environment variables
+    if IS_KAGGLE:
+        print("Running on Kaggle. Using Kaggle secrets...")
+        secrets = UserSecretsClient()
+        hf_token = secrets.get_secret("HF_TOKEN")
+        wandb_token = secrets.get_secret("WAND_DB_API_KEY")
+    else:
+        print("Running locally. Trying to load from .env...")
+        try:
+            load_dotenv()
+            print(".env file loaded successfully.")
+        except Exception as e:
+            print(f"Warning: Could not load .env file. Exception: {e}")
+
+        hf_token = os.getenv("HF_TOKEN")
+        wandb_token = os.getenv("WAND_DB_API_KEY")
+
+    # Hugging Face login
     try:
-        token = os.getenv("HF_TOKEN")
-
-        if not token:
-            raise ValueError("HF_TOKEN not found. Make sure to set it in the environment variables or .env file.")
-
-        # Log in to Hugging Face Hub
-        huggingface_hub.login(token)
+        if not hf_token:
+            raise ValueError("Hugging Face token not found.")
+        huggingface_hub.login(hf_token)
         print("Logged in to Hugging Face Hub successfully.")
-
     except Exception as e:
         print(f"Error during Hugging Face login: {e}")
-        # Handle the error appropriately (e.g., exit or retry)
 
-    # wand db login
+    # Weights & Biases login
     try:
-        api_key = os.getenv("WAND_DB_API_KEY")
-        timber.info(f"{api_key = }")
-
-        if not api_key:
-            raise ValueError(
-                "WAND_DB_API_KEY not found. Make sure to set it in the environment variables or .env file.")
-
-        # Log in to Hugging Face Hub
-        wandb.login(key=api_key)
-        print("Logged in to wand db successfully.")
-
+        if not wandb_token:
+            raise ValueError("W&B token not found.")
+        wandb.login(key=wandb_token)
+        print("Logged in to Weights & Biases successfully.")
     except Exception as e:
-        print(f"Error during wand db Face login: {e}")
+        print(f"Error during W&B login: {e}")
     pass
 
 def get_dataset_length(dataset_name=None, split=None, local_path=None):
