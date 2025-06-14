@@ -1,6 +1,7 @@
 accelerate>=0.26.0  # required by HayenaDNA
 datasets~=3.5.1
 pandas~=2.2.3
+pandas-stubs==2.2.3.250527
 polars~=1.29.0
 numpy~=1.26.4
 matplotlib

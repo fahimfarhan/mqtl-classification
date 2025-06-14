@@ -44,7 +44,7 @@ run_name_prefix = "dna-bert-6-mqtl-classifier"
 run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M")
 # run_platform="laptop"
 
-CONVERT_TO_KMER= (MODEL_NAME == "zhihan1996/DNA_bert_6")
+CONVERT_TO_KMER = (MODEL_NAME == "zhihan1996/DNA_bert_6")
 WINDOW = 1024  # use small window on your laptop gpu (eg nvidia rtx 2k), and large window on datacenter gpu (T4, P100, etc)
 RUN_NAME = f"{run_name_prefix}-{WINDOW}-{run_name_suffix}"
 SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}"
@@ -64,7 +64,7 @@ NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
 print("init arguments completed")
 
 """ Common codes """
-class DNaBert6PagingMQTLDataset(PagingMQTLDataset):
+class DnaBert6PagingMQTLDataset(PagingMQTLDataset):
     def preprocess(self, row: dict):
         sequence = row["sequence"]
         label = row["label"]
@@ -72,7 +72,7 @@ class DNaBert6PagingMQTLDataset(PagingMQTLDataset):
         kmerSeq = toKmerSequence(sequence)
         kmerSeqTokenized = self.bertTokenizer(
             kmerSeq,
-            max_length=self.seqLength, # 2048,
+            max_length = WINDOW, # self.seqLength, # I messed up with passing seqLength somewhere. For now, set the global variable WINDOW
             padding='max_length',
             return_tensors="pt"
         )
@@ -86,6 +86,7 @@ class DNaBert6PagingMQTLDataset(PagingMQTLDataset):
             "attention_mask": attention_mask.int(),  # hyenaDNA does not have attention layer
             "labels": label_tensor
         }
+
         return encoded_map
 
 
@@ -394,32 +395,6 @@ class MQTLClassifierModule(pl.LightningModule):
         if self.max_grad_norm is not None:
             torch.nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
 
-class DnaBert6PagingMQTLDataset(PagingMQTLDataset):
-    def preprocess(self, row: dict):
-        sequence = row["sequence"]
-        label = row["label"]
-
-        kmerSeq = toKmerSequence(sequence)
-        kmerSeqTokenized = self.bertTokenizer(
-            kmerSeq,
-            max_length=WINDOW,
-            padding='max_length',
-            return_tensors="pt"
-        )
-        input_ids = kmerSeqTokenized["input_ids"]
-        attention_mask = kmerSeqTokenized["attention_mask"]
-        input_ids: torch.Tensor = torch.Tensor(input_ids)
-        attention_mask = torch.Tensor(attention_mask)
-        label_tensor = torch.tensor(label)
-        encoded_map: dict = {
-            "input_ids": input_ids.long(),
-            "attention_mask": attention_mask.int(),  # hyenaDNA does not have attention layer
-            "labels": label_tensor
-        }
-
-        return encoded_map
-
-
 def createSingleDnaBert6PagingDatasets(
         data_files,
         split,
@@ -428,7 +403,7 @@ def createSingleDnaBert6PagingDatasets(
         splitSequenceRequired
 ) -> DnaBert6PagingMQTLDataset:  # I can't come up with creative names
     is_my_laptop = isMyLaptop()
-    if not is_my_laptop:
+    if is_my_laptop:
         dataset_map = load_dataset("csv", data_files=data_files, streaming=True)
         dataset_len = get_dataset_length(local_path=data_files[split], split=split)
     else:
@@ -537,7 +512,11 @@ def start():
 
     # L = T + k - 3 [for dna bert 6, we have 2 extra tokens, cls, and sep]
     rawSequenceLength = WINDOW + 6 - 3
-    train_dataset, val_dataset, test_dataset = createDnaBert6PagingTrainValTestDatasets(tokenizer=dnaTokenizer, window=rawSequenceLength, toKmer=CONVERT_TO_KMER)
+    train_dataset, val_dataset, test_dataset = createDnaBert6PagingTrainValTestDatasets(
+        tokenizer=dnaTokenizer,
+        window=rawSequenceLength, # I messed up the logic somewhere
+        toKmer=CONVERT_TO_KMER
+    )
 
 
     train_loader = DataLoader(train_dataset, batch_size=PER_DEVICE_BATCH_SIZE, shuffle=False, collate_fn=dataCollator) # Can't shuffle the paging/streaming datasets
