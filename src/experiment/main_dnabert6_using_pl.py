@@ -44,19 +44,18 @@ run_name_prefix = "dna-bert-6-mqtl-classifier"
 run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M")
 # run_platform="laptop"
 
-RUN_NAME = f"{run_name_prefix}-{run_name_suffix}"
 CONVERT_TO_KMER= (MODEL_NAME == "zhihan1996/DNA_bert_6")
 WINDOW = 1024  # use small window on your laptop gpu (eg nvidia rtx 2k), and large window on datacenter gpu (T4, P100, etc)
-
-SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}-{WINDOW}"
-SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}-{WINDOW}"
+RUN_NAME = f"{run_name_prefix}-{WINDOW}-{run_name_suffix}"
+SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}"
+SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}"
 
 NUM_EPOCHS = 1
-NUM_ROWS = 2_000    # hardcoded value
 PER_DEVICE_BATCH_SIZE = getDynamicBatchSize()
 NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
 
 # use it for step based implementation (huggingface trainer library)
+# NUM_ROWS = 2_000    # hardcoded value
 # EPOCHS = 1
 # effective_batch_size = PER_DEVICE_BATCH_SIZE * NUM_GPUS
 # STEPS_PER_EPOCH = NUM_ROWS // effective_batch_size
@@ -429,7 +428,7 @@ def createSingleDnaBert6PagingDatasets(
         splitSequenceRequired
 ) -> DnaBert6PagingMQTLDataset:  # I can't come up with creative names
     is_my_laptop = isMyLaptop()
-    if is_my_laptop:
+    if not is_my_laptop:
         dataset_map = load_dataset("csv", data_files=data_files, streaming=True)
         dataset_len = get_dataset_length(local_path=data_files[split], split=split)
     else:
@@ -569,7 +568,7 @@ def start():
             pl.callbacks.LearningRateMonitor(logging_interval='epoch'),
         ],
         logger=[
-            pl.loggers.TensorBoardLogger(save_dir="../experiment/tensorboard", name="logs"),
+            pl.loggers.TensorBoardLogger(save_dir="tensorboard", name="logs"),
             pl.loggers.WandbLogger(name=RUN_NAME, project="mqtl-classification"),
         ],
         strategy="auto",
@@ -583,15 +582,15 @@ def start():
         timber.error(f"Error during training/evaluating: {x}")
     finally:
         try:
-            trainer.test(plModule, dataloaders=test_loader)
-        except Exception as e:
-            timber.error(f"Error during testing: {e}")
+            save_fine_tuned_model(mainModel=mainModel)
+        except Exception as x:
+            timber.error(f"Error during fine-tuning: {x}")
+        pass
 
     try:
-        save_fine_tuned_model(mainModel=mainModel)
-    except Exception as x:
-        timber.error(f"Error during fine-tuning: {x}")
-    pass
+        trainer.test(plModule, dataloaders=test_loader)
+    except Exception as e:
+        timber.error(f"Error during testing: {e}")
 
 def main():
     start_time = datetime.now()
