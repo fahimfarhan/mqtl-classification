@@ -44,12 +44,12 @@ run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M")
 # run_platform="laptop"
 
 CONVERT_TO_KMER = (MODEL_NAME == "zhihan1996/DNA_bert_6")
-WINDOW = 1024  # use small window on your laptop gpu (eg nvidia rtx 2k), and large window on datacenter gpu (T4, P100, etc)
+WINDOW = 2048  # use small window on your laptop gpu (eg nvidia rtx 2k), and large window on datacenter gpu (T4, P100, etc)
 RUN_NAME = f"{run_name_prefix}-{WINDOW}-{run_name_suffix}"
 SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}"
 SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}"
 
-NUM_EPOCHS = 1
+NUM_EPOCHS = 50
 PER_DEVICE_BATCH_SIZE = getDynamicBatchSize()
 NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
 
@@ -129,7 +129,7 @@ class HyenaDnaMQTLClassifierModule(pl.LightningModule):
         self.train_metrics.clear()
         # for k, v in metrics.items():
         #     self.log(f"train_{k}", v, prog_bar=True)
-        pretty_print_metrics(metrics, "Train")
+        pretty_print_metrics(metrics, f"epoch {self.current_epoch}: Train")
         pass
 
     def validation_step(self, batch, batch_idx) -> STEP_OUTPUT:
@@ -143,7 +143,7 @@ class HyenaDnaMQTLClassifierModule(pl.LightningModule):
         self.val_metrics.clear()
         # for k, v in metrics.items():
         #     self.log(f"eval_{k}", v, prog_bar=True)
-        pretty_print_metrics(metrics, "Eval")
+        pretty_print_metrics(metrics, f"epoch {self.current_epoch}: Eval")
         pass
 
     def test_step(self, batch, batch_idx) -> STEP_OUTPUT:
@@ -157,7 +157,7 @@ class HyenaDnaMQTLClassifierModule(pl.LightningModule):
         self.test_metrics.clear()
         # for k, v in metrics.items():
         #     self.log(f"test_{k}", v, prog_bar=True)
-        pretty_print_metrics(metrics, "Test")
+        pretty_print_metrics(metrics, f"epoch {self.current_epoch}: Test")
         pass
 
     def configure_optimizers(self):
