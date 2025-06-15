@@ -181,7 +181,7 @@ def createSingleHyenaDnaPagingDatasets(
         splitSequenceRequired
 ) -> HyenaDnaPagingMQTLDataset:  # I can't come up with creative names
     is_my_laptop = isMyLaptop()
-    if not is_my_laptop:
+    if is_my_laptop:
         dataset_map = load_dataset("csv", data_files=data_files, streaming=True)
         dataset_len = get_dataset_length(local_path=data_files[split], split=split)
     else:
