@@ -11,6 +11,7 @@ the steps:
 * push weights, & biases to wandb
 * save the kaggle notebook result into github
 """
+from pytorch_lightning.callbacks import EarlyStopping
 from transformers.modeling_outputs import SequenceClassifierOutput
 
 """ import dependencies """
@@ -48,6 +49,7 @@ SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}"
 NUM_EPOCHS = 50
 PER_DEVICE_BATCH_SIZE = getDynamicBatchSize()
 NUM_GPUS = max(torch.cuda.device_count(), 1)  # fallback to 1 if no GPU
+ENABLE_LOGGING = True
 
 # use it for step based implementation (huggingface trainer library)
 # NUM_ROWS = 2_000    # hardcoded value
@@ -123,36 +125,50 @@ class HyenaDnaMQTLClassifierModule(pl.LightningModule):
     def on_train_epoch_end(self) -> None:
         metrics = self.train_metrics.compute()
         self.train_metrics.clear()
-        # for k, v in metrics.items():
-        #     self.log(f"train_{k}", v, prog_bar=True)
+
+        for k, v in metrics.items():
+            self.log(f"train_{k}", v, prog_bar=True, on_epoch=True, logger=True)
+
         pretty_print_metrics(metrics, f"epoch {self.current_epoch}: Train")
         pass
 
     def validation_step(self, batch, batch_idx) -> STEP_OUTPUT:
         labels = batch["labels"]
         loss, logits = self.forward(batch)
+
+        # Log the loss
+        self.log("eval_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
+
         self.val_metrics.update(logits=logits, labels=labels)
         return loss
 
     def on_validation_epoch_end(self) -> None:
         metrics = self.val_metrics.compute()
         self.val_metrics.clear()
-        # for k, v in metrics.items():
-        #     self.log(f"eval_{k}", v, prog_bar=True)
+
+        for k, v in metrics.items():
+            self.log(f"eval_{k}", v, prog_bar=True, on_epoch=True, logger=True)
+
         pretty_print_metrics(metrics, f"epoch {self.current_epoch}: Eval")
         pass
 
     def test_step(self, batch, batch_idx) -> STEP_OUTPUT:
         labels = batch["labels"]
         loss, logits = self.forward(batch)
+
+        # Log the loss
+        self.log("test_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
+
         self.test_metrics.update(logits=logits, labels=labels)
         return loss
 
     def on_test_epoch_end(self) -> None:
         metrics = self.test_metrics.compute()
         self.test_metrics.clear()
-        # for k, v in metrics.items():
-        #     self.log(f"test_{k}", v, prog_bar=True)
+
+        for k, v in metrics.items():
+            self.log(f"test_{k}", v, prog_bar=True, on_epoch=True, logger=True)
+
         pretty_print_metrics(metrics, f"epoch {self.current_epoch}: Test")
         pass
 
@@ -251,7 +267,7 @@ def start():
 
     disableAnnoyingWarnings()
 
-    if isMyLaptop():
+    if isMyLaptop() or not ENABLE_LOGGING:
         wandb.init(mode="offline")  # Logs only locally
     else:
         # datacenter eg huggingface or kaggle.
@@ -278,6 +294,12 @@ def start():
     val_loader = DataLoader(val_dataset, batch_size=PER_DEVICE_BATCH_SIZE, shuffle=False, collate_fn=dataCollator)
     test_loader = DataLoader(test_dataset, batch_size=PER_DEVICE_BATCH_SIZE, shuffle=False, collate_fn=dataCollator)
 
+    earlyStoppingCallback = EarlyStopping(
+        monitor='eval_loss',
+        patience=3,
+        mode='min',
+        verbose=True
+    )
     print("create trainer")
 
     trainer = pl.Trainer(
@@ -300,6 +322,7 @@ def start():
                 save_on_train_epoch_end=True,  # save at end of epoch
             ),
             pl.callbacks.LearningRateMonitor(logging_interval='epoch'),
+            earlyStoppingCallback,
         ],
         logger=[
             pl.loggers.TensorBoardLogger(save_dir="tensorboard", name="logs"),
@@ -315,11 +338,12 @@ def start():
     except Exception as x:
         timber.error(f"Error during training/evaluating: {x}")
     finally:
-        try:
-            save_fine_tuned_model(mainModel=mainModel)
-        except Exception as x:
-            timber.error(f"Error during fine-tuning: {x}")
-        pass
+        if ENABLE_LOGGING:
+            try:
+                save_fine_tuned_model(mainModel=mainModel)
+            except Exception as x:
+                timber.error(f"Error during fine-tuning: {x}")
+            pass
 
     try:
         trainer.test(plModule, dataloaders=test_loader)
