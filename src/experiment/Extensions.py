@@ -26,34 +26,36 @@ green = "\u001b[32m"
 yellow = "\u001b[33m"
 blue = "\u001b[34m"
 
+
 def getDynamicGpuDevice():
     if torch.cuda.is_available():
         return torch.device("cuda")  # For NVIDIA GPUs
     elif torch.backends.mps.is_available():
         return torch.device("mps")  # For Apple Silicon Macs
     else:
-        return torch.device("cpu")   # Fallback to CPU
+        return torch.device("cpu")  # Fallback to CPU
+
 
 def getDynamicBatchSize():
     if torch.cuda.is_available():
         gpu_name = torch.cuda.get_device_name(0).lower()
         vramGiB = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)  # Convert to GB
 
-        if "a100" in gpu_name:   # A100 (40GB+ VRAM)
+        if "a100" in gpu_name:  # A100 (40GB+ VRAM)
             batch_size = 128
         elif "v100" in gpu_name:  # V100 (16GB/32GB VRAM)
             batch_size = 64 if vramGiB >= 32 else 32
         elif "p100" in gpu_name:  # P100 (16GB VRAM)
             batch_size = 32
-        elif "t4" in gpu_name:    # Tesla T4 (16GB VRAM, common in Colab/Kaggle)
+        elif "t4" in gpu_name:  # Tesla T4 (16GB VRAM, common in Colab/Kaggle)
             batch_size = 32  # Maybe try 64 if no OOM
         elif "rtx 3090" in gpu_name or vramGiB >= 24:  # RTX 3090 (24GB VRAM)
             batch_size = 64
-        elif vramGiB >= 16:   # Any other 16GB+ VRAM GPUs
+        elif vramGiB >= 16:  # Any other 16GB+ VRAM GPUs
             batch_size = 32
-        elif vramGiB >= 8:    # 8GB VRAM GPUs (e.g., RTX 2080, 3060, etc.)
+        elif vramGiB >= 8:  # 8GB VRAM GPUs (e.g., RTX 2080, 3060, etc.)
             batch_size = 16
-        elif vramGiB >= 6:    # 6GB VRAM GPUs (e.g., RTX 2060)
+        elif vramGiB >= 6:  # 6GB VRAM GPUs (e.g., RTX 2060)
             batch_size = 8
         else:
             batch_size = 4  # Safe fallback for smaller GPUs
@@ -62,12 +64,13 @@ def getDynamicBatchSize():
 
     return batch_size
 
+
 def getGpuName():
     gpu_name = torch.cuda.get_device_name(0).lower()
     return gpu_name
 
 
-def toKmerSequence(seq: str, k: int=6) -> str:
+def toKmerSequence(seq: str, k: int = 6) -> str:
     """
     :param seq:  ATCGTTCAATCGTTCA.........
     :param k: 6
@@ -87,6 +90,7 @@ def pretty_print_metrics(metrics: dict, stage: str = ""):
     )
     print(metrics_str)
 
+
 class PagingMQTLDataset(IterableDataset):
     def __init__(
             self,
@@ -95,18 +99,18 @@ class PagingMQTLDataset(IterableDataset):
             seqLength: int,
             toKmer: bool,
             datasetLen: int
-        ):
+    ):
         self.someDataset = someDataset
         self.bertTokenizer = bertTokenizer
         self.seqLength = seqLength
         self.toKmer = toKmer
-        self.datasetLen=datasetLen
+        self.datasetLen = datasetLen
         pass
 
     """
     # if you're using lightning ai, don't define the __len__. 
     # But in Huggingface transformer, setting the __len__ was kinda convenient
-    
+
     def __len__(self):
         return self.datasetLen
     """
@@ -140,9 +144,11 @@ class PagingMQTLDataset(IterableDataset):
     def preprocess(self, row: dict):
         raise Exception("Please override this function")
 
+
 def isMyLaptop() -> bool:
     is_my_laptop = os.path.isdir("/home/gamegame/")
     return is_my_laptop
+
 
 def signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases():
     # Try to import kaggle_secrets only if available (i.e., on Kaggle)
@@ -187,6 +193,7 @@ def signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases():
         print(f"Error during W&B login: {e}")
     pass
 
+
 def get_dataset_length(dataset_name=None, split=None, local_path=None):
     try:
         if local_path:
@@ -198,59 +205,6 @@ def get_dataset_length(dataset_name=None, split=None, local_path=None):
         print(f"Error while loading length for {split}: {e}")
         return None
 
-def createSinglePagingDatasets(
-        data_files,
-        split,
-        tokenizer,
-        window,
-        splitSequenceRequired
-) -> PagingMQTLDataset:  # I can't come up with creative names
-    is_my_laptop = isMyLaptop()
-    if is_my_laptop:
-        dataset_map = load_dataset("csv", data_files=data_files, streaming=True)
-        dataset_len = get_dataset_length(local_path=data_files[split], split=split)
-    else:
-        dataset_map = load_dataset("fahimfarhan/mqtl-classification-datasets", streaming=True)
-        dataset_len = get_dataset_length(dataset_name="fahimfarhan/mqtl-classification-datasets", split=split)
-
-    print(f"{split = } ==> {dataset_len = }")
-    return PagingMQTLDataset(
-        someDataset=dataset_map[f"train_binned_{window}"],
-        bertTokenizer=tokenizer,
-        seqLength=window,
-        toKmer=splitSequenceRequired,
-        datasetLen = dataset_len
-    )
-
-
-def createPagingTrainValTestDatasets(tokenizer, window, toKmer) -> (PagingMQTLDataset, PagingMQTLDataset, PagingMQTLDataset):
-    prefix = "/home/gamegame/PycharmProjects/mqtl-classification/src/datageneration/"
-
-    data_files = {
-        # small
-        "train_binned_1029": f"{prefix}dataset_1029_train_binned.csv",
-        "validate_binned_1029": f"{prefix}dataset_1029_validate_binned.csv",
-        "test_binned_1029": f"{prefix}dataset_1029_train_binned.csv",
-
-        # medium
-        "train_binned_2053": f"{prefix}dataset_1029_train_binned.csv",
-        "validate_binned_2053": f"{prefix}dataset_1029_validate_binned.csv",
-        "test_binned_2053": f"{prefix}dataset_1029_test_binned.csv",
-
-        # large
-        "train_binned_4101": f"{prefix}dataset_1029_train_binned.csv",
-        "validate_binned_4101": f"{prefix}dataset_1029_validate_binned.csv",
-        "test_binned_4101": f"{prefix}dataset_1029_test_binned.csv",
-    }
-
-    # not sure if this is a good idea. if anything goes wrong, revert back to previous code of this function
-    train_dataset = createSinglePagingDatasets(data_files, f"train_binned_{window}", tokenizer, window, toKmer)
-
-    val_dataset =createSinglePagingDatasets(data_files, f"validate_binned_{window}", tokenizer, window, toKmer)
-
-    test_dataset = createSinglePagingDatasets(data_files, f"test_binned_{window}", tokenizer, window, toKmer)
-
-    return train_dataset, val_dataset, test_dataset
 
 def disableAnnoyingWarnings():
     # Caution! if anything goes wrong, enable it. make sure this warning related issue ain't the culprit!
@@ -260,6 +214,7 @@ def disableAnnoyingWarnings():
         category=UserWarning,
         module="torch.utils.data.dataloader"
     )
+
 
 class ComputeMetricsUsingSkLearn:
     def __init__(self):

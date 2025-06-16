@@ -19,12 +19,8 @@ from typing import Optional, Union
 
 import pytorch_lightning as pl
 from pytorch_lightning.utilities.types import STEP_OUTPUT
-from torch import nn
-from torch.nn import MSELoss, CrossEntropyLoss
 from torch.optim import AdamW, Optimizer
 from torch.utils.data import DataLoader
-from transformers import BertPreTrainedModel, AutoModel, AutoConfig, AutoTokenizer
-from transformers.models.bert.modeling_bert import BERT_START_DOCSTRING, BertModel, BERT_INPUTS_DOCSTRING
 
 try:
     from src.experiment.Extensions import *
@@ -44,7 +40,7 @@ run_name_suffix = datetime.now().strftime("%Y-%m-%d-%H-%M")
 # run_platform="laptop"
 
 CONVERT_TO_KMER = (MODEL_NAME == "zhihan1996/DNA_bert_6")
-WINDOW = 2048  # use small window on your laptop gpu (eg nvidia rtx 2k), and large window on datacenter gpu (T4, P100, etc)
+WINDOW = 1024  # use small window on your laptop gpu (eg nvidia rtx 2k), and large window on datacenter gpu (T4, P100, etc)
 RUN_NAME = f"{run_name_prefix}-{WINDOW}-{run_name_suffix}"
 SAVE_MODEL_IN_LOCAL_DIRECTORY= f"fine-tuned-{RUN_NAME}"
 SAVE_MODEL_IN_REMOTE_REPOSITORY = f"fahimfarhan/{RUN_NAME}"
@@ -188,9 +184,10 @@ def createSingleHyenaDnaPagingDatasets(
         dataset_map = load_dataset("fahimfarhan/mqtl-classification-datasets", streaming=True)
         dataset_len = get_dataset_length(dataset_name="fahimfarhan/mqtl-classification-datasets", split=split)
 
+    someDataset = dataset_map[split]
     print(f"{split = } ==> {dataset_len = }")
     return HyenaDnaPagingMQTLDataset(
-        someDataset=dataset_map[f"train_binned_{window}"],
+        someDataset=someDataset,
         bertTokenizer=tokenizer,
         seqLength=window,
         toKmer=splitSequenceRequired,
