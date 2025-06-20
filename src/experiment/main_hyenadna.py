@@ -297,7 +297,7 @@ def start():
             earlyStoppingCallback,
         ],
         logger=[
-            pl.loggers.TensorBoardLogger(save_dir="tensorboard", name="logs"),
+            pl.loggers.TensorBoardLogger(save_dir=f"tensorboard-{run_name}", name="logs"),
             pl.loggers.WandbLogger(name=run_name, project="mqtl-classification"),
         ],
         strategy="auto",
