@@ -316,7 +316,7 @@ def start():
     if args.ENABLE_LOGGING:
         signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases()
     else:
-        wandb.init("offline")
+        wandb.init(mode="offline")  # Logs only locally
 
     model_name = args.MODEL_NAME
 
