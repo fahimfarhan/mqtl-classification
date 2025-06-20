@@ -1,5 +1,8 @@
+import argparse
 import logging
 import os
+import uuid
+from datetime import datetime
 
 import evaluate
 import huggingface_hub
@@ -255,3 +258,78 @@ class ComputeMetricsUsingSkLearn:
     def clear(self):
         self.logits.clear()
         self.labels.clear()
+
+
+def save_fine_tuned_model(
+    mainModel,
+    repository,
+    commit_message,
+):
+    # save the model in huggingface repository, and local storage
+    mainModel.save_pretrained(save_directory=repository, safe_serialization=False)
+    # push to the hub
+    is_my_laptop = isMyLaptop()
+
+    if is_my_laptop:  # no need to save
+        return
+
+    mainModel.push_to_hub(
+        repo_id=repository,
+        # subfolder=f"my-awesome-model-{WINDOW}", subfolder didn't work :/
+        commit_message=commit_message,
+        safe_serialization=False
+    )
+    pass
+
+
+
+def get_run_name_suffix():
+    date = datetime.now().strftime("%y%b%d")  # e.g. 25Jun20
+    rand = str(uuid.uuid4())[:4]              # e.g. a9f1
+    return f"{date}-{rand}"
+
+
+def parse_args():
+    # ------------------------
+    # Default Config Values
+    # ------------------------
+    DEFAULT_MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
+    DEFAULT_RUN_NAME_PREFIX = "hyena-dna-mqtl-classifier"
+    DEFAULT_WINDOW = 1024
+    DEFAULT_NUM_EPOCHS = 10
+    DEFAULT_PER_DEVICE_BATCH_SIZE = None  # dynamic
+    DEFAULT_NUM_GPUS = None  # dynamic
+    DEFAULT_ENABLE_LOGGING = False
+    DEFAULT_RUN_NAME_SUFFIX = None
+    DEFAULT_SAVE_MODEL_IN_LOCAL_DIRECTORY = None
+    DEFAULT_SAVE_MODEL_IN_REMOTE_REPOSITORY = None
+
+    # ------------------------
+    # Argument Parsing
+    # ------------------------
+    parser = argparse.ArgumentParser(description="Train or fine-tune HyenaDNA or DNA_BERT")
+
+    parser.add_argument("--MODEL_NAME", type=str, default=DEFAULT_MODEL_NAME,
+                        help="Pretrained model name or path")
+    parser.add_argument("--run_name_prefix", type=str, default=DEFAULT_RUN_NAME_PREFIX,
+                        help="Prefix for naming this run")
+    parser.add_argument("--WINDOW", type=int, default=DEFAULT_WINDOW,
+                        help="Sliding window size for input sequences")
+    parser.add_argument("--NUM_EPOCHS", type=int, default=DEFAULT_NUM_EPOCHS,
+                        help="Total number of training epochs")
+    parser.add_argument("--PER_DEVICE_BATCH_SIZE", type=int, default=DEFAULT_PER_DEVICE_BATCH_SIZE,
+                        help="Batch size per device. If not set, it will be determined dynamically.")
+    parser.add_argument("--NUM_GPUS", type=int, default=DEFAULT_NUM_GPUS,
+                        help="Number of GPUs to use. If not set, auto-detected via torch.")
+    parser.add_argument("--ENABLE_LOGGING", action="store_true", default=DEFAULT_ENABLE_LOGGING,
+                        help="Enable logging with tools like W&B")
+
+    # Optional: override naming
+    parser.add_argument("--run_name_suffix", type=str, default=DEFAULT_RUN_NAME_SUFFIX,
+                        help="Override automatic run name suffix")
+    parser.add_argument("--SAVE_MODEL_IN_LOCAL_DIRECTORY", type=str, default=DEFAULT_SAVE_MODEL_IN_LOCAL_DIRECTORY,
+                        help="Custom local directory to save model")
+    parser.add_argument("--SAVE_MODEL_IN_REMOTE_REPOSITORY", type=str, default=DEFAULT_SAVE_MODEL_IN_REMOTE_REPOSITORY,
+                        help="Custom HuggingFace repo name to push model")
+
+    return parser.parse_args()
