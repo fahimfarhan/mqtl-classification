@@ -5,7 +5,7 @@ if __name__ == "__main__":
     # small
     "train_binned_1027": "_1027_train_binned.csv",
     "validate_binned_1027": "_1027_validate_binned.csv",
-    "test_binned_1027": "_1027_train_binned.csv",
+    "test_binned_1027": "_1027_test_binned.csv",
 
     # medium
     "train_binned_2051": "_2051_train_binned.csv",

@@ -13,7 +13,7 @@ from transformers import PreTrainedTokenizer, BertPreTrainedModel, BertTokenizer
     DataCollatorWithPadding, Trainer, BatchEncoding, AutoConfig, AutoModelForSequenceClassification, AutoModel
 from transformers.models.bert.modeling_bert import BERT_START_DOCSTRING, BertModel, BERT_INPUTS_DOCSTRING
 
-from src.experiment.main import getDynamicGpuDevice
+from src.experiment.main_hyenadna import getDynamicGpuDevice
 
 logger = logging.getLogger(__name__)
 

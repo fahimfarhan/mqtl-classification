@@ -66,7 +66,7 @@ class HyenaDnaPagingMQTLDataset(PagingMQTLDataset):
         sequence = row["sequence"]
         label = row["label"]
 
-        seqTokenized = self.bertTokenizer(  # for hyena dna not a bert tokenizer. eg, no attention etc. misleading name
+        seqTokenized = self.dnaSeqTokenizer(  # for hyena dna not a bert tokenizer. eg, no attention etc. misleading name
             sequence,
         )
         input_ids = seqTokenized["input_ids"]
@@ -87,7 +87,7 @@ class HyenaDnaMQTLClassifierModule(pl.LightningModule):
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.max_grad_norm = max_grad_norm
-        self.criterion = torch.nn.CrossEntropyLoss()
+        # self.criterion = torch.nn.CrossEntropyLoss()
 
         self.train_metrics = ComputeMetricsUsingSkLearn()
         self.val_metrics = ComputeMetricsUsingSkLearn()
@@ -204,7 +204,7 @@ def createSingleHyenaDnaPagingDatasets(
     print(f"{split = } ==> {dataset_len = }")
     return HyenaDnaPagingMQTLDataset(
         someDataset=someDataset,
-        bertTokenizer=tokenizer,
+        dnaSeqTokenizer=tokenizer,
         seqLength=window,
         toKmer=splitSequenceRequired,
         datasetLen = dataset_len

@@ -70,7 +70,7 @@ class DnaBert6PagingMQTLDataset(PagingMQTLDataset):
         label = row["label"]
 
         kmerSeq = toKmerSequence(sequence)
-        kmerSeqTokenized = self.bertTokenizer(
+        kmerSeqTokenized = self.dnaSeqTokenizer(
             kmerSeq,
             max_length = WINDOW, # self.seqLength, # I messed up with passing seqLength somewhere. For now, set the global variable WINDOW
             padding='max_length',
@@ -413,7 +413,7 @@ def createSingleDnaBert6PagingDatasets(
     print(f"{split = } ==> {dataset_len = }")
     return DnaBert6PagingMQTLDataset(
         someDataset=dataset_map[f"train_binned_{window}"],
-        bertTokenizer=tokenizer,
+        dnaSeqTokenizer=tokenizer,
         seqLength=window,
         toKmer=splitSequenceRequired,
         datasetLen = dataset_len

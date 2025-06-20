@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, roc_auc_score
 from torch.utils.data import IterableDataset, get_worker_info
 from transformers import BertTokenizer, BatchEncoding, AutoTokenizer, \
-    AutoModelForSequenceClassification, AutoConfig, TrainingArguments, Trainer, DataCollatorWithPadding
+    AutoModelForSequenceClassification, AutoConfig, TrainingArguments, Trainer, DataCollatorWithPadding, \
+    PreTrainedTokenizer
 import torch
 import warnings
 import torch
@@ -95,13 +96,13 @@ class PagingMQTLDataset(IterableDataset):
     def __init__(
             self,
             someDataset: Dataset,
-            bertTokenizer: BertTokenizer,
+            dnaSeqTokenizer: PreTrainedTokenizer,
             seqLength: int,
             toKmer: bool,
             datasetLen: int
     ):
         self.someDataset = someDataset
-        self.bertTokenizer = bertTokenizer
+        self.dnaSeqTokenizer = dnaSeqTokenizer
         self.seqLength = seqLength
         self.toKmer = toKmer
         self.datasetLen = datasetLen
