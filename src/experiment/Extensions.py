@@ -337,11 +337,11 @@ def parse_args():
     parser.add_argument("--SAVE_MODEL_IN_REMOTE_REPOSITORY", type=str, default=DEFAULT_SAVE_MODEL_IN_REMOTE_REPOSITORY,
                         help="Custom HuggingFace repo name to push model")
 
-    parser.add_argument("--DEFAULT_LEARNING_RATE", type=float, default=DEFAULT_LEARNING_RATE,
+    parser.add_argument("--LEARNING_RATE", type=float, default=DEFAULT_LEARNING_RATE,
                         help="Set the learning rate")
-    parser.add_argument("--DEFAULT_WEIGHT_DECAY", type=float, default=DEFAULT_WEIGHT_DECAY,
+    parser.add_argument("--WEIGHT_DECAY", type=float, default=DEFAULT_WEIGHT_DECAY,
                         help="Set the weight decay")
-    parser.add_argument("--DEFAULT_OPTIMIZER", type=str, default=DEFAULT_OPTIMIZER,
+    parser.add_argument("--OPTIMIZER", type=str, default=DEFAULT_OPTIMIZER,
                         help="Set the optimizer")
 
     return parser.parse_args()
