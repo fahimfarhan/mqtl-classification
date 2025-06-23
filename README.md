@@ -7,7 +7,11 @@ python3 main_hyenadna.py \
   --MODEL_NAME LongSafari/hyenadna-small-32k-seqlen-hf \
   --run_name_prefix hyena-dna-mqtl-classifier \
   --WINDOW 1024 \
-  --NUM_EPOCHS 50
+  --NUM_EPOCHS 15 \
+  --ENABLE_LOGGING \
+  --DEFAULT_LEARNING_RATE 5e-4 \
+  --DEFAULT_WEIGHT_DECAY 0.01 \
+  --DEFAULT_OPTIMIZER adam
 ```
 
 ## linear scheduler => accuracy auc 0.5, consant lr adam => opimizer overfiting
