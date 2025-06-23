@@ -11,6 +11,8 @@ the steps:
 * push weights, & biases to wandb
 * save the kaggle notebook result into github
 """
+from torch.optim import Optimizer
+from transformers import get_cosine_schedule_with_warmup
 
 """ import dependencies """
 from typing import Optional, Union
@@ -18,7 +20,6 @@ from typing import Optional, Union
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.utilities.types import STEP_OUTPUT
-from torch.optim import AdamW, Optimizer
 from torch.utils.data import DataLoader
 from transformers.modeling_outputs import SequenceClassifierOutput
 
@@ -46,13 +47,14 @@ class HyenaDNAPagingMQTLDataset(PagingMQTLDataset):
 
 
 class HyenaDNAMQTLClassifierModule(pl.LightningModule):
-    def __init__(self, model, learning_rate=5e-5, weight_decay=0.0, max_grad_norm=1.0):
+    def __init__(self, model, learning_rate:float, weight_decay:float, optimizer_name: str, max_grad_norm:float=1.0):
         super().__init__()
         self.model = model
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.max_grad_norm = max_grad_norm
-        self.criterion = torch.nn.CrossEntropyLoss()
+        self.optimizer_name = optimizer_name
+        # self.criterion = torch.nn.CrossEntropyLoss()
 
         train_metrics = ComputeMetricsUsingSkLearn()
         val_metrics = ComputeMetricsUsingSkLearn()
@@ -120,9 +122,38 @@ class HyenaDNAMQTLClassifierModule(pl.LightningModule):
         total_norm = total_norm ** 0.5
         self.log("grad_norm", total_norm, prog_bar=True, on_step=True, on_epoch=False)
 
+
+
     def configure_optimizers(self):
-        optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
-        return optimizer
+        optimizer = get_optimizer(name=self.optimizer_name, parameters=self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+
+        warmup_ratio = 0.01 # 1% warm up ratio
+        # Total steps = num_epochs * steps_per_epoch
+        # Set this dynamically outside if you want exact control
+        num_training_steps = self.trainer.estimated_stepping_batches
+        num_warmup_steps = int(warmup_ratio * num_training_steps)
+
+        scheduler = get_cosine_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=num_warmup_steps,
+            num_training_steps=num_training_steps
+        )
+
+        scheduler_config = {
+            "scheduler": scheduler,
+            "interval": "step",  # step-wise decay
+            "frequency": 1,
+            "name": "learning_rate",  # shows up in wandb as `learning_rate`
+        }
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": scheduler_config
+        }
+
+    # def configure_optimizers(self):
+    #     optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+    #     return optimizer
 
     """ 
     def configure_optimizers(self):
@@ -303,7 +334,12 @@ def start():
         strategy="auto",
     )
 
-    plModule = HyenaDNAMQTLClassifierModule(mainModel)
+    plModule = HyenaDNAMQTLClassifierModule(
+        model=mainModel,
+        learning_rate=args.LEARNING_RATE,
+        weight_decay=args.WEIGHT_DECAY,
+        optimizer_name=args.OPTIMIZER,
+    )
     try:
         trainer.fit(plModule, train_dataloaders=train_loader, val_dataloaders=val_loader)
     except Exception as x:

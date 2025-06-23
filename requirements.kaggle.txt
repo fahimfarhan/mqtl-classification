@@ -1,5 +1,7 @@
-!pip install evaluate
-!pip install huggingface
-!pip install huggingface_hub[hf_xet]  # sth to do with offline support
-!pip install python-dotenv
-!pip install wandb
+!pip install -q evaluate
+!pip install -q huggingface
+!pip install -q huggingface_hub[hf_xet]  # sth to do with offline support
+!pip install -q python-dotenv
+!pip install -q wandb
+!pip install -q lion-pytorch
+!pip install -q adan-pytorch
