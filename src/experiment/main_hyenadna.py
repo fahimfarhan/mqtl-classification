@@ -264,6 +264,9 @@ def start():
     print(f"SAVE_MODEL_IN_LOCAL_DIRECTORY: {save_model_in_local_directory}")
     print(f"SAVE_MODEL_IN_REMOTE_REPOSITORY: {save_model_in_remote_repository}")
     print(f"COMMIT_MESSAGE: {commit_msg_and_wandb_run_name}")
+    print(f"LEARNING_RATE: {args.LEARNING_RATE}")
+    print(f"WEIGHT_DECAY: {args.WEIGHT_DECAY}")
+    print(f"OPTIMIZER: {args.OPTIMIZER}")
     print("=" * 60)
 
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # to prevent out of memory error

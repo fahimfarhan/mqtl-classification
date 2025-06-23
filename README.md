@@ -9,9 +9,9 @@ python3 main_hyenadna.py \
   --WINDOW 1024 \
   --NUM_EPOCHS 15 \
   --ENABLE_LOGGING \
-  --DEFAULT_LEARNING_RATE 5e-4 \
-  --DEFAULT_WEIGHT_DECAY 0.01 \
-  --DEFAULT_OPTIMIZER adam
+  --LEARNING_RATE 5e-4 \
+  --WEIGHT_DECAY 0.01 \
+  --OPTIMIZER adam
 ```
 
 ## linear scheduler => accuracy auc 0.5, consant lr adam => opimizer overfiting
