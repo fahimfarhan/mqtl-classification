@@ -124,36 +124,36 @@ class HyenaDNAMQTLClassifierModule(pl.LightningModule):
 
 
 
+    # def configure_optimizers(self):
+    #     optimizer = get_optimizer(name=self.optimizer_name, parameters=self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+    #
+    #     warmup_ratio = 0.01 # 1% warm up ratio
+    #     # Total steps = num_epochs * steps_per_epoch
+    #     # Set this dynamically outside if you want exact control
+    #     num_training_steps = self.trainer.estimated_stepping_batches
+    #     num_warmup_steps = int(warmup_ratio * num_training_steps)
+    #
+    #     scheduler = get_cosine_schedule_with_warmup(
+    #         optimizer,
+    #         num_warmup_steps=num_warmup_steps,
+    #         num_training_steps=num_training_steps
+    #     )
+    #
+    #     scheduler_config = {
+    #         "scheduler": scheduler,
+    #         "interval": "step",  # step-wise decay
+    #         "frequency": 1,
+    #         "name": "learning_rate",  # shows up in wandb as `learning_rate`
+    #     }
+    #
+    #     return {
+    #         "optimizer": optimizer,
+    #         "lr_scheduler": scheduler_config
+    #     }
+
     def configure_optimizers(self):
         optimizer = get_optimizer(name=self.optimizer_name, parameters=self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
-
-        warmup_ratio = 0.01 # 1% warm up ratio
-        # Total steps = num_epochs * steps_per_epoch
-        # Set this dynamically outside if you want exact control
-        num_training_steps = self.trainer.estimated_stepping_batches
-        num_warmup_steps = int(warmup_ratio * num_training_steps)
-
-        scheduler = get_cosine_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=num_warmup_steps,
-            num_training_steps=num_training_steps
-        )
-
-        scheduler_config = {
-            "scheduler": scheduler,
-            "interval": "step",  # step-wise decay
-            "frequency": 1,
-            "name": "learning_rate",  # shows up in wandb as `learning_rate`
-        }
-
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": scheduler_config
-        }
-
-    # def configure_optimizers(self):
-    #     optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
-    #     return optimizer
+        return optimizer
 
     """ 
     def configure_optimizers(self):
