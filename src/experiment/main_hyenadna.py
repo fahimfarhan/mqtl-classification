@@ -11,8 +11,6 @@ the steps:
 * push weights, & biases to wandb
 * save the kaggle notebook result into github
 """
-from torch.optim import Optimizer
-from transformers import get_cosine_schedule_with_warmup
 
 """ import dependencies """
 from typing import Optional, Union
@@ -20,13 +18,14 @@ from typing import Optional, Union
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.utilities.types import STEP_OUTPUT
+from torch.optim import AdamW, Optimizer
 from torch.utils.data import DataLoader
 from transformers.modeling_outputs import SequenceClassifierOutput
-
-try:
-    from Extensions import *
-except ImportError as ie:
-    print(ie)
+from Extensions import *
+# try:
+#     from Extensions import *
+# except ImportError as ie:
+#     print(ie)
 
 class HyenaDNAPagingMQTLDataset(PagingMQTLDataset):
     def preprocess(self, row: dict):
@@ -122,64 +121,9 @@ class HyenaDNAMQTLClassifierModule(pl.LightningModule):
         total_norm = total_norm ** 0.5
         self.log("grad_norm", total_norm, prog_bar=True, on_step=True, on_epoch=False)
 
-
-
-    # def configure_optimizers(self):
-    #     optimizer = get_optimizer(name=self.optimizer_name, parameters=self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
-    #
-    #     warmup_ratio = 0.01 # 1% warm up ratio
-    #     # Total steps = num_epochs * steps_per_epoch
-    #     # Set this dynamically outside if you want exact control
-    #     num_training_steps = self.trainer.estimated_stepping_batches
-    #     num_warmup_steps = int(warmup_ratio * num_training_steps)
-    #
-    #     scheduler = get_cosine_schedule_with_warmup(
-    #         optimizer,
-    #         num_warmup_steps=num_warmup_steps,
-    #         num_training_steps=num_training_steps
-    #     )
-    #
-    #     scheduler_config = {
-    #         "scheduler": scheduler,
-    #         "interval": "step",  # step-wise decay
-    #         "frequency": 1,
-    #         "name": "learning_rate",  # shows up in wandb as `learning_rate`
-    #     }
-    #
-    #     return {
-    #         "optimizer": optimizer,
-    #         "lr_scheduler": scheduler_config
-    #     }
-
     def configure_optimizers(self):
         optimizer = get_optimizer(name=self.optimizer_name, parameters=self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
         return optimizer
-
-    """ 
-    def configure_optimizers(self):
-        optimizer = AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
-
-        num_training_steps = self.trainer.estimated_stepping_batches
-        num_warmup_steps = int(0.1 * num_training_steps)  # 10% warmup
-
-        scheduler = get_linear_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=num_warmup_steps,
-            num_training_steps=num_training_steps
-        )
-
-        scheduler_config = {
-            "scheduler": scheduler,
-            "interval": "step",  # step-wise decay
-            "frequency": 1,
-            "name": "learning_rate",  # shows up in wandb as `learning_rate`
-        }
-
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": scheduler_config
-        }
-    """
 
     def configure_gradient_clipping(
             self,

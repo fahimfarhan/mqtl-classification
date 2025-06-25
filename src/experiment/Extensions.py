@@ -1,3 +1,4 @@
+# Extensions.py
 import argparse
 import logging
 import os
@@ -9,7 +10,8 @@ import huggingface_hub
 from huggingface_hub import HfApi
 import numpy as np
 from torch.optim import AdamW, Adam
-
+from lion_pytorch import Lion
+from adan_pytorch import Adan
 import wandb
 from datasets import load_dataset, Dataset, DatasetDict
 from dotenv import load_dotenv
@@ -305,8 +307,8 @@ def parse_args():
     DEFAULT_RUN_NAME_SUFFIX = None
     DEFAULT_SAVE_MODEL_IN_LOCAL_DIRECTORY = None
     DEFAULT_SAVE_MODEL_IN_REMOTE_REPOSITORY = None
-    DEFAULT_LEARNING_RATE = 5e-4
-    DEFAULT_WEIGHT_DECAY = 0.01
+    DEFAULT_LEARNING_RATE = 5e-5
+    DEFAULT_WEIGHT_DECAY = 0.0
     DEFAULT_OPTIMIZER = "adam"
 
     # ------------------------
@@ -343,20 +345,16 @@ def parse_args():
                         help="Set the weight decay")
     parser.add_argument("--OPTIMIZER", type=str, default=DEFAULT_OPTIMIZER,
                         help="Set the optimizer")
-
     return parser.parse_args()
 
 def get_optimizer(name, parameters, lr, weight_decay):
     if name == "adamw":
         return AdamW(parameters, lr=lr, weight_decay=weight_decay)
     elif name == "lion":
-        from lion_pytorch import Lion
         return Lion(parameters, lr=lr, weight_decay=weight_decay)
     elif name == "adan":
-        from adan_pytorch import Adan
         return Adan(parameters, lr=lr, weight_decay=weight_decay)
     elif name == "adam":
-        from adan_pytorch import Adan
         return Adam(parameters, lr=lr, weight_decay=weight_decay)
     else:
         raise ValueError(f"Unsupported optimizer: {name}")
