@@ -16,7 +16,7 @@ from transformers import BertPreTrainedModel, BertTokenizer, \
     DataCollatorWithPadding, BatchEncoding, AutoConfig, AutoModel
 from transformers.models.bert.modeling_bert import BERT_START_DOCSTRING, BertModel, BERT_INPUTS_DOCSTRING
 
-from src.experiment.main_hyenadna import getDynamicGpuDevice
+from src.experiment.main import getDynamicGpuDevice
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from sklearn.metrics import (

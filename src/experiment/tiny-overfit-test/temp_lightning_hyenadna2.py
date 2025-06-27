@@ -30,6 +30,7 @@ from sklearn.metrics import (
     recall_score,
 )
 
+from src.experiment.all_models import HyenaDNAWithDropoutAndNorm
 
 logger = logging.getLogger(__name__)
 
@@ -291,8 +292,8 @@ def start():
     model_name = "LongSafari/hyenadna-small-32k-seqlen-hf"
 
     dnaTokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-    mainModel = AutoModelForSequenceClassification.from_pretrained(model_name, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
-
+    # mainModel = AutoModelForSequenceClassification.from_pretrained(model_name, trust_remote_code=True) # this is the correct way to load pretrained weights, and modify config
+    mainModel = HyenaDNAWithDropoutAndNorm(model_name)
 
     print(mainModel)
 

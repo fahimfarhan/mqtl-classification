@@ -22,6 +22,7 @@ from torch.optim import AdamW, Optimizer
 from torch.utils.data import DataLoader
 from transformers.modeling_outputs import SequenceClassifierOutput
 from Extensions import *
+from all_models import getModel
 # try:
 #     from Extensions import *
 # except ImportError as ie:
@@ -199,6 +200,7 @@ def start():
     print("=" * 60)
     print(f"RUN_NAME: {run_name}")
     print(f"MODEL_NAME: {args.MODEL_NAME}")
+    print(f"MODEL_NAME: {args.MODEL_VARIANT}")
     print(f"WINDOW: {args.WINDOW}")
     print(f"NUM_EPOCHS: {args.NUM_EPOCHS}")
     print(f"PER_DEVICE_BATCH_SIZE: {per_device_batch_size}")
@@ -227,10 +229,7 @@ def start():
         model_name,
         trust_remote_code=True,
     )
-    mainModel = AutoModelForSequenceClassification.from_pretrained(
-        model_name,
-        trust_remote_code=True,
-    )
+    mainModel = getModel(base_model_name = args.MODEL_NAME, model_variant = args.MODEL_VARIANT)
 
     train_dataset, val_dataset, test_dataset = createHyenaDnaPagingTrainValTestDatasets(
         tokenizer=dnaTokenizer,

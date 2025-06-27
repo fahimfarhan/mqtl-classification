@@ -298,6 +298,7 @@ def parse_args():
     # Default Config Values
     # ------------------------
     DEFAULT_MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
+    DEFAULT_MODEL_VARIANT = "default"
     DEFAULT_RUN_NAME_PREFIX = "hyena-dna-mqtl-classifier"
     DEFAULT_WINDOW = 1024
     DEFAULT_NUM_EPOCHS = 10
@@ -318,6 +319,8 @@ def parse_args():
 
     parser.add_argument("--MODEL_NAME", type=str, default=DEFAULT_MODEL_NAME,
                         help="Pretrained model name or path")
+    parser.add_argument("--MODEL_VARIANT", type=str, default=DEFAULT_MODEL_VARIANT,
+                        help="Model variant")
     parser.add_argument("--run_name_prefix", type=str, default=DEFAULT_RUN_NAME_PREFIX,
                         help="Prefix for naming this run")
     parser.add_argument("--WINDOW", type=int, default=DEFAULT_WINDOW,
