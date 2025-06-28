@@ -6,7 +6,7 @@
 python3 main.py \
   --MODEL_NAME LongSafari/hyenadna-small-32k-seqlen-hf \
   --MODEL_VARIANT HyenaDNAWithDropoutAndNorm \
-  --run_name_prefix hyena-dna-mqtl-classifier \
+  --RUN_NAME_PREFIX hyena-dna-mqtl-classifier \
   --WINDOW 1024 \
   --NUM_EPOCHS 15 \
   --ENABLE_LOGGING \
@@ -62,7 +62,7 @@ ConfusionMatrixDisplay.from_predictions(y_true, y_pred)
 python3 main.py \
   --MODEL_NAME LongSafari/hyenadna-small-32k-seqlen-hf \
   --MODEL_VARIANT HyenaDNAWithDropoutAndNorm \
-  --run_name_prefix hyena-dna-mqtl-classifier \
+  --RUN_NAME_PREFIX hyena-dna-mqtl-classifier \
   --WINDOW 1024 \
   --NUM_EPOCHS 2 \
   --LEARNING_RATE 5e-4 \

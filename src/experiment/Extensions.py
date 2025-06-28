@@ -321,7 +321,7 @@ def parse_args():
                         help="Pretrained model name or path")
     parser.add_argument("--MODEL_VARIANT", type=str, default=DEFAULT_MODEL_VARIANT,
                         help="Model variant")
-    parser.add_argument("--run_name_prefix", type=str, default=DEFAULT_RUN_NAME_PREFIX,
+    parser.add_argument("--RUN_NAME_PREFIX", type=str, default=DEFAULT_RUN_NAME_PREFIX,
                         help="Prefix for naming this run")
     parser.add_argument("--WINDOW", type=int, default=DEFAULT_WINDOW,
                         help="Sliding window size for input sequences")
@@ -335,7 +335,7 @@ def parse_args():
                         help="Enable logging with tools like W&B")
 
     # Optional: override naming
-    parser.add_argument("--run_name_suffix", type=str, default=DEFAULT_RUN_NAME_SUFFIX,
+    parser.add_argument("--RUN_NAME_SUFFIX", type=str, default=DEFAULT_RUN_NAME_SUFFIX,
                         help="Override automatic run name suffix")
     parser.add_argument("--SAVE_MODEL_IN_LOCAL_DIRECTORY", type=str, default=DEFAULT_SAVE_MODEL_IN_LOCAL_DIRECTORY,
                         help="Custom local directory to save model")

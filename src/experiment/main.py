@@ -66,6 +66,11 @@ class HyenaDNAMQTLClassifierModule(pl.LightningModule):
             "test": test_metrics,
         }
 
+    def configure_optimizers(self):
+        optimizer = get_optimizer(name=self.optimizer_name, parameters=self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+        return optimizer
+
+
     def forward(self, batch):
         seqClassifierOutput: SequenceClassifierOutput = self.model(**batch)
         return seqClassifierOutput.loss, seqClassifierOutput.logits
@@ -121,10 +126,6 @@ class HyenaDNAMQTLClassifierModule(pl.LightningModule):
                 total_norm += param_norm.item() ** 2
         total_norm = total_norm ** 0.5
         self.log("grad_norm", total_norm, prog_bar=True, on_step=True, on_epoch=False)
-
-    def configure_optimizers(self):
-        optimizer = get_optimizer(name=self.optimizer_name, parameters=self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
-        return optimizer
 
     def configure_gradient_clipping(
             self,
@@ -185,10 +186,10 @@ def createHyenaDnaPagingTrainValTestDatasets(
 def start():
     args = parse_args()
 
-    run_name_suffix = args.run_name_suffix or get_run_name_suffix()
+    run_name_suffix = args.RUN_NAME_SUFFIX or get_run_name_suffix()
     convert_to_kmer = (args.MODEL_NAME == "zhihan1996/DNA_bert_6")
 
-    run_name = f"{args.run_name_prefix}-{args.WINDOW}" # "-{run_name_suffix}"
+    run_name = f"{args.RUN_NAME_PREFIX}-{args.WINDOW}" # "-{run_name_suffix}"
     save_model_in_local_directory = args.SAVE_MODEL_IN_LOCAL_DIRECTORY or f"fine-tuned-{run_name}"
     save_model_in_remote_repository = args.SAVE_MODEL_IN_REMOTE_REPOSITORY or f"fahimfarhan/{run_name}"
 
