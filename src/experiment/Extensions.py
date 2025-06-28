@@ -309,7 +309,9 @@ def parse_args():
     DEFAULT_SAVE_MODEL_IN_LOCAL_DIRECTORY = None
     DEFAULT_SAVE_MODEL_IN_REMOTE_REPOSITORY = None
     DEFAULT_LEARNING_RATE = 5e-5
-    DEFAULT_WEIGHT_DECAY = 0.0
+    DEFAULT_L1_LAMBDA_WEIGHT = 1e-3 # l1 regularization
+    DEFAULT_WEIGHT_DECAY = 0.0 # L2 regularization
+    DEFAULT_GRADIENT_CLIP = 1.0
     DEFAULT_OPTIMIZER = "adam"
 
     # ------------------------
@@ -344,8 +346,12 @@ def parse_args():
 
     parser.add_argument("--LEARNING_RATE", type=float, default=DEFAULT_LEARNING_RATE,
                         help="Set the learning rate")
+    parser.add_argument("--L1_LAMBDA_WEIGHT", type=float, default=DEFAULT_L1_LAMBDA_WEIGHT,
+                        help="Set the L1 regularization lambda weight")
     parser.add_argument("--WEIGHT_DECAY", type=float, default=DEFAULT_WEIGHT_DECAY,
-                        help="Set the weight decay")
+                        help="Set the L2 regularization weight decay")
+    parser.add_argument("--GRADIENT_CLIP", type=float, default=DEFAULT_GRADIENT_CLIP,
+                        help="Set the gradient clipping")
     parser.add_argument("--OPTIMIZER", type=str, default=DEFAULT_OPTIMIZER,
                         help="Set the optimizer")
     return parser.parse_args()
@@ -361,3 +367,22 @@ def get_optimizer(name, parameters, lr, weight_decay):
         return Adam(parameters, lr=lr, weight_decay=weight_decay)
     else:
         raise ValueError(f"Unsupported optimizer: {name}")
+
+
+class MyArgs:
+    MODEL_NAME = "LongSafari/hyenadna-small-32k-seqlen-hf"
+    MODEL_VARIANT = "default"
+    RUN_NAME_PREFIX = "hyena-dna-mqtl-classifier"
+    WINDOW = 1024
+    NUM_EPOCHS = 10
+    PER_DEVICE_BATCH_SIZE = None  # dynamic
+    NUM_GPUS = None  # dynamic
+    ENABLE_LOGGING = False
+    RUN_NAME_SUFFIX = None
+    SAVE_MODEL_IN_LOCAL_DIRECTORY = None
+    SAVE_MODEL_IN_REMOTE_REPOSITORY = None
+    LEARNING_RATE = 5e-5
+    L1_LAMBDA_WEIGHT = 1e-3  # l1 regularization
+    WEIGHT_DECAY = 0.0  # L2 regularization
+    GRADIENT_CLIP = 1.0
+    OPTIMIZER = "adam"

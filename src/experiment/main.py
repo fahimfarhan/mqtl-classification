@@ -47,12 +47,19 @@ class HyenaDNAPagingMQTLDataset(PagingMQTLDataset):
 
 
 class HyenaDNAMQTLClassifierModule(pl.LightningModule):
-    def __init__(self, model, learning_rate:float, weight_decay:float, optimizer_name: str, max_grad_norm:float=1.0):
+    def __init__(
+        self,
+         model,
+         learning_rate:float,
+         weight_decay:float,
+         optimizer_name: str,
+         l1_lambda:float=1.0,
+    ):
         super().__init__()
         self.model = model
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
-        self.max_grad_norm = max_grad_norm
+        self.l1_lambda = l1_lambda
         self.optimizer_name = optimizer_name
         # self.criterion = torch.nn.CrossEntropyLoss()
 
@@ -92,7 +99,14 @@ class HyenaDNAMQTLClassifierModule(pl.LightningModule):
             current_lr = self.trainer.optimizers[0].param_groups[0]["lr"]
             self.log("lr", current_lr, prog_bar=False, on_step=True, on_epoch=False)
 
-            return self.common_step(batch, batch_idx, stage="train")
+            loss = self.common_step(batch, batch_idx, stage="train")
+            if self.l1_lambda > 0:
+                raw_l1 = sum(p.abs().sum() for p in self.parameters())
+                l1_penalty = self.l1_lambda * raw_l1
+                loss = loss + l1_penalty
+                self.log("l1_penalty", l1_penalty, prog_bar=True, on_step=True)
+
+            return loss
 
     def validation_step(self, batch, batch_idx) -> STEP_OUTPUT:
         return self.common_step(batch, batch_idx, stage="eval")
@@ -127,14 +141,15 @@ class HyenaDNAMQTLClassifierModule(pl.LightningModule):
         total_norm = total_norm ** 0.5
         self.log("grad_norm", total_norm, prog_bar=True, on_step=True, on_epoch=False)
 
-    def configure_gradient_clipping(
-            self,
-            optimizer: Optimizer,
-            gradient_clip_val: Optional[Union[int, float]] = None,
-            gradient_clip_algorithm: Optional[str] = None,
-    ) -> None:
-        if self.max_grad_norm is not None:
-            torch.nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
+    # Manual gradient clipping
+    # def configure_gradient_clipping(
+    #         self,
+    #         optimizer: Optimizer,
+    #         gradient_clip_val: Optional[Union[int, float]] = None,
+    #         gradient_clip_algorithm: Optional[str] = None,
+    # ) -> None:
+    #     if self.max_grad_norm is not None:
+    #         torch.nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
 
 
 def createSingleHyenaDnaPagingDatasets(
@@ -212,7 +227,9 @@ def start():
     print(f"SAVE_MODEL_IN_REMOTE_REPOSITORY: {save_model_in_remote_repository}")
     print(f"COMMIT_MESSAGE: {commit_msg_and_wandb_run_name}")
     print(f"LEARNING_RATE: {args.LEARNING_RATE}")
+    print(f"L1_LAMBDA_WEIGHT: {args.L1_LAMBDA_WEIGHT}")
     print(f"WEIGHT_DECAY: {args.WEIGHT_DECAY}")
+    print(f"GRADIENT_CLIP: {args.GRADIENT_CLIP}")
     print(f"OPTIMIZER: {args.OPTIMIZER}")
     print("=" * 60)
 
@@ -258,7 +275,7 @@ def start():
         val_check_interval=1.0,  # validate at end of each epoch
         enable_progress_bar=True,
         enable_model_summary=True,
-        gradient_clip_val=None,
+        gradient_clip_val=args.GRADIENT_CLIP,
         accumulate_grad_batches=1,
         precision=32,
         default_root_dir="output_checkpoints",
@@ -286,6 +303,7 @@ def start():
         learning_rate=args.LEARNING_RATE,
         weight_decay=args.WEIGHT_DECAY,
         optimizer_name=args.OPTIMIZER,
+        l1_lambda=args.L1_LAMBDA_WEIGHT,
     )
     try:
         trainer.fit(plModule, train_dataloaders=train_loader, val_dataloaders=val_loader)
