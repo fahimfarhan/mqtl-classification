@@ -15,7 +15,7 @@ from adan_pytorch import Adan
 import wandb
 from datasets import load_dataset, Dataset, DatasetDict
 from dotenv import load_dotenv
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, roc_auc_score
+from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, roc_auc_score, confusion_matrix
 from torch.utils.data import IterableDataset, get_worker_info
 from transformers import BertTokenizer, BatchEncoding, AutoTokenizer, \
     AutoModelForSequenceClassification, AutoConfig, TrainingArguments, Trainer, DataCollatorWithPadding, \
@@ -92,11 +92,20 @@ def toKmerSequence(seq: str, k: int = 6) -> str:
 
 
 def pretty_print_metrics(metrics: dict, stage: str = ""):
-    metrics_str = f"\n📊 {stage} Metrics:\n" + "\n".join(
-        f"  {k:>15}: {v:.4f}" if v is not None else f"  {k:>15}: N/A"
-        for k, v in metrics.items()
-    )
-    print(metrics_str)
+    print(f"\n📊 {stage} Metrics:")
+    for k, v in metrics.items():
+        if k == "confusion_matrix":
+            print(f"  {k:>15}:")
+            # If v is a list of lists, print row by row
+            if isinstance(v, (list, np.ndarray)):
+                for row in v:
+                    print(" " * 18, row)
+            else:
+                print(" " * 18, v)
+        elif v is not None:
+            print(f"  {k:>15}: {v:.4f}")
+        else:
+            print(f"  {k:>15}: N/A")
 
 
 class PagingMQTLDataset(IterableDataset):
@@ -253,7 +262,8 @@ class ComputeMetricsUsingSkLearn:
                 "roc_auc": roc_auc_score(labels, positive_logits),
                 "precision": precision_score(labels, predictions, average="weighted", zero_division=0),
                 "recall": recall_score(labels, predictions, average="weighted", zero_division=0),
-                "f1": f1_score(labels, predictions, average="weighted", zero_division=0)
+                "f1": f1_score(labels, predictions, average="weighted", zero_division=0),
+                "confusion_matrix": confusion_matrix(labels, predictions).tolist(),  # convert to list for easier logging
             }
         except Exception as e:
             print(f">> Metrics computation failed: {e}")
@@ -262,7 +272,6 @@ class ComputeMetricsUsingSkLearn:
     def clear(self):
         self.logits.clear()
         self.labels.clear()
-
 
 def save_fine_tuned_model(
     mainModel,

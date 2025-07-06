@@ -118,8 +118,10 @@ class HyenaDNAMQTLClassifierModule(pl.LightningModule):
         metrics = metrics_collector.compute()
         metrics_collector.clear()
 
+        # Log only scalar metrics
         for k, v in metrics.items():
-            self.log(f"{stage}_{k}", v, prog_bar=True, on_epoch=True, logger=True)
+            if isinstance(v, (int, float, torch.Tensor)):  # Scalars are safe / ignore the confusion matrix
+                self.log(f"{stage}_{k}", v, prog_bar=True, on_epoch=True, logger=True)
 
         pretty_print_metrics(metrics, f"epoch {self.current_epoch}: {stage.capitalize()}")
 
