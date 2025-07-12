@@ -1,39 +1,20 @@
 from datasets import load_dataset, DatasetDict
 
 if __name__ == "__main__":
-  data_files = {
-    # small
-    "train_binned_1027": "_1027_train_binned.csv",
-    "validate_binned_1027": "_1027_validate_binned.csv",
-    "test_binned_1027": "_1027_test_binned.csv",
+    sizes = [1024, 1027, 2048, 2051, 4096, 4099]
+    splits = ["train", "validate", "test"]
 
-    # medium
-    "train_binned_2051": "_2051_train_binned.csv",
-    "validate_binned_2051": "_2051_validate_binned.csv",
-    "test_binned_2051": "_2051_test_binned.csv",
+    data_files = {}
 
-    # large
-    "train_binned_4099": "_4099_train_binned.csv",
-    "validate_binned_4099": "_4099_validate_binned.csv",
-    "test_binned_4099": "_4099_test_binned.csv",
+    for size in sizes:
+        for split in splits:
+            key = f"{split}_binned_{size}"
+            filename = f"_{size}_{split}_binned.csv"
+            data_files[key] = filename
 
-    # small
-    "train_binned_1024": "_1024_train_binned.csv",
-    "validate_binned_1024": "_1024_validate_binned.csv",
-    "test_binned_1024": "_1024_test_binned.csv",
+    print(f"{data_files = }")
+    dataset = load_dataset("csv", data_files=data_files)
 
-    # medium
-    "train_binned_2048": "_2048_train_binned.csv",
-    "validate_binned_2048": "_2048_validate_binned.csv",
-    "test_binned_2048": "_2048_test_binned.csv",
+    # Push dataset to Hugging Face Hub
+    dataset.push_to_hub("fahimfarhan/mqtl-classification-datasets")
 
-    # large
-    "train_binned_4096": "_4096_train_binned.csv",
-    "validate_binned_4096": "_4096_validate_binned.csv",
-    "test_binned_4096": "_4096_test_binned.csv",
-  }
-  dataset = load_dataset("csv", data_files=data_files)
-
-  # Push dataset to Hugging Face hub
-  dataset.push_to_hub("fahimfarhan/mqtl-classification-datasets")
-  pass
