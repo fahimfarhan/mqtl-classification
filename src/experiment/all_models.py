@@ -1,10 +1,55 @@
-
+from argparse import Namespace
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 from transformers import AutoModelForSequenceClassification
 from transformers.modeling_outputs import SequenceClassifierOutput, BaseModelOutputWithNoAttention
+
+class HyenaDNAWithDropout(nn.Module):
+    def __init__(
+            self,
+            model_name,
+            dropout_prob: float=0.25,
+            criterion_label_smoothening: float = 0.1,
+    ):
+        super().__init__()
+        self.variant = "HyenaDNAWithDropout"
+
+        self.base_model = AutoModelForSequenceClassification.from_pretrained(
+            model_name,
+            trust_remote_code=True,
+        )
+
+        self.hyena = self.base_model.hyena
+        self.dropout = nn.Dropout(dropout_prob)
+        self.score = self.base_model.score
+
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=criterion_label_smoothening)
+        pass
+
+    def forward(self, input_ids=None, attention_mask=None, labels=None, **kwargs):
+        outputs: BaseModelOutputWithNoAttention = self.hyena(
+            input_ids=input_ids,
+            # attention_mask=attention_mask, # hyena doesn't have attention
+            **kwargs
+        )
+        hidden: Tensor = outputs[0]  # [batch_size, hidden_dim]
+        hidden = self.dropout(hidden)
+        logits = self.score(hidden)
+        pooled = logits.mean(dim=1)  # [B, C]
+
+        loss = None
+        if labels is not None:
+            loss = self.criterion(pooled, labels)
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=pooled,
+            hidden_states=None,
+            attentions=None
+        )
+
 
 class HyenaDNAWithDropoutAndNorm(nn.Module):
     def __init__(
@@ -52,7 +97,10 @@ class HyenaDNAWithDropoutAndNorm(nn.Module):
             attentions=None
         )
 
-def getModel(base_model_name: str, model_variant: str=None):
+def getModel(args: Namespace) -> nn.Module:
+    base_model_name = args.MODEL_NAME
+    model_variant = args.MODEL_VARIANT
+
     if base_model_name == "LongSafari/hyenadna-small-32k-seqlen-hf":
         if model_variant == "default":
             return AutoModelForSequenceClassification.from_pretrained(
@@ -60,6 +108,16 @@ def getModel(base_model_name: str, model_variant: str=None):
                 trust_remote_code=True,
             )
         if model_variant == "HyenaDNAWithDropoutAndNorm":
-            return HyenaDNAWithDropoutAndNorm(model_name = base_model_name)
+            return HyenaDNAWithDropoutAndNorm(
+                model_name = base_model_name,
+                dropout_prob = args.DROP_OUT_PROBABILITY,
+                criterion_label_smoothening=args.CRITERION_LABEL_SMOOTHENING,
+            )
+        if model_variant == "HyenaDNAWithDropout":
+            return HyenaDNAWithDropout(
+                model_name = base_model_name,
+                dropout_prob = args.DROP_OUT_PROBABILITY,
+                criterion_label_smoothening=args.CRITERION_LABEL_SMOOTHENING,
+            )
 
     raise ValueError(f"Unknown base model: {base_model_name}, or model variant: {model_variant}")

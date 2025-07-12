@@ -232,6 +232,8 @@ def start():
     print(f"L1_LAMBDA_WEIGHT: {args.L1_LAMBDA_WEIGHT}")
     print(f"WEIGHT_DECAY: {args.WEIGHT_DECAY}")
     print(f"GRADIENT_CLIP: {args.GRADIENT_CLIP}")
+    print(f"DROP_OUT_PROBABILITY: {args.DROP_OUT_PROBABILITY}")
+    print(f"CRITERION_LABEL_SMOOTHENING: {args.CRITERION_LABEL_SMOOTHENING}")
     print(f"OPTIMIZER: {args.OPTIMIZER}")
     print("=" * 60)
 
@@ -249,7 +251,7 @@ def start():
         model_name,
         trust_remote_code=True,
     )
-    mainModel = getModel(base_model_name = args.MODEL_NAME, model_variant = args.MODEL_VARIANT)
+    mainModel = getModel(args = args)
 
     train_dataset, val_dataset, test_dataset = createHyenaDnaPagingTrainValTestDatasets(
         tokenizer=dnaTokenizer,

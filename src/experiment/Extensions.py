@@ -3,6 +3,7 @@ import argparse
 import logging
 import os
 import uuid
+from argparse import Namespace
 from datetime import datetime
 
 import evaluate
@@ -302,7 +303,7 @@ def get_run_name_suffix():
     return f"{date}-{rand}"
 
 
-def parse_args():
+def parse_args() -> Namespace:
     # ------------------------
     # Default Config Values
     # ------------------------
@@ -318,11 +319,12 @@ def parse_args():
     DEFAULT_SAVE_MODEL_IN_LOCAL_DIRECTORY = None
     DEFAULT_SAVE_MODEL_IN_REMOTE_REPOSITORY = None
     DEFAULT_LEARNING_RATE = 5e-5
-    DEFAULT_L1_LAMBDA_WEIGHT = 1e-3 # l1 regularization
+    DEFAULT_L1_LAMBDA_WEIGHT = -1 # l1 regularization
     DEFAULT_WEIGHT_DECAY = 0.0 # L2 regularization
     DEFAULT_GRADIENT_CLIP = 1.0
     DEFAULT_OPTIMIZER = "adam"
-
+    DEFAULT_DROP_OUT_PROBABILITY = 0.25
+    DEFAULT_CRITERION_LABEL_SMOOTHENING = 0.1 # criterion_label_smoothening
     # ------------------------
     # Argument Parsing
     # ------------------------
@@ -361,6 +363,10 @@ def parse_args():
                         help="Set the L2 regularization weight decay")
     parser.add_argument("--GRADIENT_CLIP", type=float, default=DEFAULT_GRADIENT_CLIP,
                         help="Set the gradient clipping")
+    parser.add_argument("--DROP_OUT_PROBABILITY", type=float, default=DEFAULT_DROP_OUT_PROBABILITY,
+                        help="Set the dropout probability")
+    parser.add_argument("--CRITERION_LABEL_SMOOTHENING", type=float, default=DEFAULT_CRITERION_LABEL_SMOOTHENING,
+                        help="Set the criterion label smoothening")
     parser.add_argument("--OPTIMIZER", type=str, default=DEFAULT_OPTIMIZER,
                         help="Set the optimizer")
     return parser.parse_args()
@@ -391,7 +397,9 @@ class MyArgs:
     SAVE_MODEL_IN_LOCAL_DIRECTORY = None
     SAVE_MODEL_IN_REMOTE_REPOSITORY = None
     LEARNING_RATE = 5e-5
-    L1_LAMBDA_WEIGHT = 1e-3  # l1 regularization
+    L1_LAMBDA_WEIGHT = -1  # l1 regularization
     WEIGHT_DECAY = 0.0  # L2 regularization
     GRADIENT_CLIP = 1.0
     OPTIMIZER = "adam"
+    DROP_OUT_PROBABILITY = 0.25
+    DEFAULT_CRITERION_LABEL_SMOOTHENING = 0.1
