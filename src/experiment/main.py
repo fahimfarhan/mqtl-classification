@@ -235,6 +235,7 @@ def start():
     print(f"DROP_OUT_PROBABILITY: {args.DROP_OUT_PROBABILITY}")
     print(f"CRITERION_LABEL_SMOOTHENING: {args.CRITERION_LABEL_SMOOTHENING}")
     print(f"OPTIMIZER: {args.OPTIMIZER}")
+    print(f"EARLY_STOPPING: {args.EARLY_STOPPING}")
     print("=" * 60)
 
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # to prevent out of memory error
@@ -265,12 +266,25 @@ def start():
     val_loader = DataLoader(val_dataset, batch_size=per_device_batch_size, shuffle=False, collate_fn=dataCollator)
     test_loader = DataLoader(test_dataset, batch_size=per_device_batch_size, shuffle=False, collate_fn=dataCollator)
 
-    earlyStoppingCallback = EarlyStopping(
-        monitor='eval_loss',
-        patience=3,
-        mode='min',
-        verbose=True
-    )
+    plCallBacks = [
+            pl.callbacks.ModelCheckpoint(
+                dirpath="output_checkpoints",
+                save_top_k=1,  # todo: -1 means no checkpoint is saved. 1 means top 1 checkpoint is saved.
+                every_n_train_steps=None,
+                save_weights_only=False,
+                save_on_train_epoch_end=True,  # save at end of epoch
+            ),
+            pl.callbacks.LearningRateMonitor(logging_interval='epoch'),
+
+        ]
+    if args.EARLY_STOPPING:
+        earlyStoppingCallback = EarlyStopping(
+            monitor='eval_loss',
+            patience=3,
+            mode='min',
+            verbose=True
+        )
+        plCallBacks.append(earlyStoppingCallback)
     print("create trainer")
 
     trainer = pl.Trainer(
@@ -284,17 +298,7 @@ def start():
         precision=32,
         default_root_dir="output_checkpoints",
         enable_checkpointing=True,
-        callbacks=[
-            pl.callbacks.ModelCheckpoint(
-                dirpath="output_checkpoints",
-                save_top_k=-1,
-                every_n_train_steps=None,
-                save_weights_only=False,
-                save_on_train_epoch_end=True,  # save at end of epoch
-            ),
-            pl.callbacks.LearningRateMonitor(logging_interval='epoch'),
-            earlyStoppingCallback,
-        ],
+        callbacks=plCallBacks,
         logger=[
             pl.loggers.TensorBoardLogger(save_dir=f"tensorboard-{run_name}", name="logs"),
             pl.loggers.WandbLogger(name=run_name, project="mqtl-classification"),

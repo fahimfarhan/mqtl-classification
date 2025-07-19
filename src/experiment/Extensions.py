@@ -315,6 +315,7 @@ def parse_args() -> Namespace:
     DEFAULT_PER_DEVICE_BATCH_SIZE = None  # dynamic
     DEFAULT_NUM_GPUS = None  # dynamic
     DEFAULT_ENABLE_LOGGING = False
+    DEFAULT_EARLY_STOPPING = False
     DEFAULT_RUN_NAME_SUFFIX = None
     DEFAULT_SAVE_MODEL_IN_LOCAL_DIRECTORY = None
     DEFAULT_SAVE_MODEL_IN_REMOTE_REPOSITORY = None
@@ -346,6 +347,8 @@ def parse_args() -> Namespace:
                         help="Number of GPUs to use. If not set, auto-detected via torch.")
     parser.add_argument("--ENABLE_LOGGING", action="store_true", default=DEFAULT_ENABLE_LOGGING,
                         help="Enable logging with tools like W&B")
+    parser.add_argument("--EARLY_STOPPING", action="store_true", default=DEFAULT_EARLY_STOPPING,
+                        help="Stop early if eval scores aren't updating.")
 
     # Optional: override naming
     parser.add_argument("--RUN_NAME_SUFFIX", type=str, default=DEFAULT_RUN_NAME_SUFFIX,
@@ -402,4 +405,5 @@ class MyArgs:
     GRADIENT_CLIP = 1.0
     OPTIMIZER = "adam"
     DROP_OUT_PROBABILITY = 0.25
-    DEFAULT_CRITERION_LABEL_SMOOTHENING = 0.1
+    CRITERION_LABEL_SMOOTHENING = 0.1
+    DEFAULT_EARLY_STOPPING = False
