@@ -1,9 +1,14 @@
 import pandas as pd
 import time
-from _00_constants import WINDOW, SLIGHTLY_LARGER_WINDOW
-
+from _00_constants import *
 
 def start():
+  mp = parse_datagen_args()
+  SLIGHTLY_LARGER_WINDOW = mp[KEY_SLIGHTLY_LARGER_WINDOW]
+  WINDOW = mp[KEY_WINDOW]
+  HALF_WINDOW = mp[KEY_HALF_WINDOW]
+  HALF_OF_BINNING_SIZE = mp[KEY_HALF_OF_BINNING_SIZE]
+
   # Step 1: Read the TSV file into a DataFrame
   df = pd.read_csv('st5_cosmopolitan_meQTL_results.txt', sep='\t')
 

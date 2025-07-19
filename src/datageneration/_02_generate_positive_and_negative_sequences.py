@@ -26,6 +26,12 @@ def extract_intervals_to_seqs(input_df: pd.DataFrame) -> list[str]:
 
 
 def start():
+  mp = parse_datagen_args()
+  SLIGHTLY_LARGER_WINDOW = mp[KEY_SLIGHTLY_LARGER_WINDOW]
+  WINDOW = mp[KEY_WINDOW]
+  HALF_WINDOW = mp[KEY_HALF_WINDOW]
+  HALF_OF_BINNING_SIZE = mp[KEY_HALF_OF_BINNING_SIZE]
+
   df_unfiltered = pd.read_csv(
     F"st5_filtered_cosmopolitan_meqtl_snp_cpg_distance_lte_{SLIGHTLY_LARGER_WINDOW}.txt",
     sep="\t",

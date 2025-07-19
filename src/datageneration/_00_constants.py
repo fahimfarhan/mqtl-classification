@@ -17,35 +17,36 @@ if T = 512 * n, and k = 6, then L = 512 * n + 6 - 3 = 512 * n + 3
 
 and so on.
 """
+import argparse
+from argparse import Namespace
+
 RANDOM_SEED = 7
-HALF_OF_BINNING_SIZE = 500  # so total binned size = 1000. 500 positive, and 500 negative sequences.
 
-# # for 1027
-# WINDOW = 1027
-# HALF_WINDOW = WINDOW // 2  # == 513
-# SLIGHTLY_LARGER_WINDOW = WINDOW + 1000
-#
-# # for 2051
-# WINDOW = 2051
-# HALF_WINDOW = WINDOW // 2  # == 1025
-# SLIGHTLY_LARGER_WINDOW = WINDOW + 1000
+KEY_WINDOW = "WINDOW"
+KEY_HALF_WINDOW = "HALF_WINDOW"
+KEY_SLIGHTLY_LARGER_WINDOW = "SLIGHTLY_LARGER_WINDOW"
+KEY_HALF_OF_BINNING_SIZE = "HALF_OF_BINNING_SIZE"
 
-# # for 4099
-# WINDOW = 4099
-# HALF_WINDOW = WINDOW // 2  # == 2049
-# SLIGHTLY_LARGER_WINDOW = WINDOW + 1000
+def parse_datagen_args() -> dict:
+    # ------------------------
+    # Default Config Values
+    # ------------------------
+    DEFAULT_WINDOW = 1024
+    parser = argparse.ArgumentParser(description="Initialize data generation")
+    parser.add_argument("--WINDOW", type=int, default=DEFAULT_WINDOW,
+                        help="Sliding window size for input sequences")
 
-# # for 1024
-WINDOW = 1024
-HALF_WINDOW = WINDOW // 2  # == 512
-SLIGHTLY_LARGER_WINDOW = WINDOW + 1000
-#
-# # for 2048
-# WINDOW = 2048
-# HALF_WINDOW = WINDOW // 2  # == 1024
-# SLIGHTLY_LARGER_WINDOW = WINDOW + 1000
+    args = parser.parse_args()
+    window = args.WINDOW
+    half_window = args.WINDOW // 2
+    slightly_larger_window = window + 1000
+    half_of_binning_size = 500
 
-# # for 4096
-# WINDOW = 4096
-# HALF_WINDOW = WINDOW // 2  # == 2048
-# SLIGHTLY_LARGER_WINDOW = WINDOW + 1000
+    mp = {
+        KEY_WINDOW : window,
+        KEY_HALF_WINDOW : half_window,
+        KEY_SLIGHTLY_LARGER_WINDOW : slightly_larger_window,
+        KEY_HALF_OF_BINNING_SIZE : half_of_binning_size,
+    }
+    print(f"parse_datagen_args {mp = }")
+    return mp

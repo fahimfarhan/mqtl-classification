@@ -61,6 +61,12 @@ def k_fold_logic(binned_df):
 if __name__ == "__main__":
   start_time = time.time()
 
+  mp = parse_datagen_args()
+  SLIGHTLY_LARGER_WINDOW = mp[KEY_SLIGHTLY_LARGER_WINDOW]
+  WINDOW = mp[KEY_WINDOW]
+  HALF_WINDOW = mp[KEY_HALF_WINDOW]
+  HALF_OF_BINNING_SIZE = mp[KEY_HALF_OF_BINNING_SIZE]
+
   df_unfiltered = pd.read_csv(f"_{WINDOW}_dataset.csv")
 
   df = df_unfiltered.dropna(subset=["sequence"])
@@ -109,7 +115,7 @@ if __name__ == "__main__":
   test.to_csv(f"_{WINDOW}_test{file_suffix}.csv", index=False)
 
   # also create dataset based on k fold logic
-  k_fold_logic(binned_df)
+  # k_fold_logic(binned_df)  # todo: maybe later
 
   # Record the end time
   end_time = time.time()
