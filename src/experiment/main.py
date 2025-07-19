@@ -192,19 +192,19 @@ def createSingleStreamingDatasets(
         split,
         tokenizer,
         window,
+        dataset_map: DatasetDict,
 ) -> MQTLStreamingDataset:  # I can't come up with creative names
 
-    dataset_map = load_dataset("fahimfarhan/mqtl-classification-datasets", streaming=True)
-    dataset_len = get_dataset_length(dataset_name="fahimfarhan/mqtl-classification-datasets", split=split)
+    # dataset_len = get_dataset_length(dataset_name="fahimfarhan/mqtl-classification-datasets", split=split)
 
     someDataset = dataset_map[split]
-    print(f"{split = } ==> {dataset_len = }")
+    # print(f"{split = } ==> {dataset_len = }")
     return MQTLStreamingDataset(
         inputArgs=inputArgs,
         someDataset=someDataset,
         dnaSeqTokenizer=tokenizer,
         seqLength=window,
-        datasetLen = dataset_len
+        datasetLen = 0 # dataset_len
     )
 
 def createStreamingTrainValTestDatasets(
@@ -213,6 +213,7 @@ def createStreamingTrainValTestDatasets(
         window: int,
 ) -> (MQTLStreamingDataset, MQTLStreamingDataset, MQTLStreamingDataset):
 
+    dataset_map: DatasetDict = load_dataset("fahimfarhan/mqtl-classification-datasets", streaming=True)
 
     # not sure if this is a good idea. if anything goes wrong, revert back to previous code of this function
     train_dataset = createSingleStreamingDatasets(
@@ -220,6 +221,7 @@ def createStreamingTrainValTestDatasets(
         split = f"train_binned_{window}",
         tokenizer=tokenizer,
         window=window,
+        dataset_map=dataset_map,
     )
 
     val_dataset = createSingleStreamingDatasets(
@@ -227,6 +229,7 @@ def createStreamingTrainValTestDatasets(
         split = f"validate_binned_{window}",
         tokenizer=tokenizer,
         window=window,
+        dataset_map=dataset_map,
     )
 
     test_dataset = createSingleStreamingDatasets(
@@ -234,6 +237,7 @@ def createStreamingTrainValTestDatasets(
         split = f"test_binned_{window}",
         tokenizer = tokenizer,
         window = window,
+        dataset_map=dataset_map,
     )
     return train_dataset, val_dataset, test_dataset
 

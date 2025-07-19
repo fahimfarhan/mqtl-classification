@@ -211,7 +211,10 @@ def signInToHuggingFaceAndWandbToUploadModelWeightsAndBiases():
         print(f"Error during W&B login: {e}")
     pass
 
-
+"""
+as the dataset grew large, the huggingface rate limiter started to give network error 429. Just use hardcoded count map if you need the count.
+for streaming dataset, I don't need it now. but for non-streaming dataset, we need the dataset size
+"""
 def get_dataset_length(dataset_name=None, split=None, local_path=None):
     try:
         if local_path:
