@@ -28,8 +28,16 @@ from all_models import getModel
 # except ImportError as ie:
 #     print(ie)
 
-class HyenaDNAPagingMQTLDataset(PagingMQTLDataset):
+class MQTLStreamingDataset(PagingMQTLDataset):
     def preprocess(self, row: dict):
+        if self.inputArgs.MODEL_NAME == "LongSafari/hyenadna-small-32k-seqlen-hf":
+            return self.preprocess_hyena_dna(row = row)
+        elif  self.inputArgs.MODEL_NAME == "zhihan1996/DNA_bert_6":
+            return self.preprocess_dna_bert_6(row = row)
+        else:
+            raise Exception(f"unknown model name {self.inputArgs.model_name}")
+
+    def preprocess_hyena_dna(self, row: dict):
         sequence = row["sequence"]
         label = row["label"]
 
@@ -45,8 +53,33 @@ class HyenaDNAPagingMQTLDataset(PagingMQTLDataset):
         }
         return encoded_map
 
+    def preprocess_dna_bert_6(self, row: dict):
+        sequence = row["sequence"]
+        label = row["label"]
 
-class HyenaDNAMQTLClassifierModule(pl.LightningModule):
+        kmerSeq = toKmerSequence(sequence)
+        kmerSeqTokenized = self.dnaSeqTokenizer(
+            kmerSeq,
+            max_length=self.inputArgs.WINDOW,
+            # self.seqLength, # I messed up with passing seqLength somewhere. For now, set the global variable WINDOW
+            padding='max_length',
+            return_tensors="pt"
+        )
+        input_ids = kmerSeqTokenized["input_ids"]
+        attention_mask = kmerSeqTokenized["attention_mask"]
+        input_ids: torch.Tensor = torch.Tensor(input_ids)
+        attention_mask = torch.Tensor(attention_mask)
+        label_tensor = torch.tensor(label)
+        encoded_map: dict = {
+            "input_ids": input_ids.long(),
+            "attention_mask": attention_mask.int(),  # hyenaDNA does not have attention layer
+            "labels": label_tensor
+        }
+
+        return encoded_map
+
+
+class MQTLClassifierModule(pl.LightningModule):
     def __init__(
         self,
          model,
@@ -154,45 +187,50 @@ class HyenaDNAMQTLClassifierModule(pl.LightningModule):
     #         torch.nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
 
 
-def createSingleHyenaDnaPagingDatasets(
+def createSingleStreamingDatasets(
+        inputArgs: Namespace,
         split,
         tokenizer,
         window,
-) -> HyenaDNAPagingMQTLDataset:  # I can't come up with creative names
+) -> MQTLStreamingDataset:  # I can't come up with creative names
 
     dataset_map = load_dataset("fahimfarhan/mqtl-classification-datasets", streaming=True)
     dataset_len = get_dataset_length(dataset_name="fahimfarhan/mqtl-classification-datasets", split=split)
 
     someDataset = dataset_map[split]
     print(f"{split = } ==> {dataset_len = }")
-    return HyenaDNAPagingMQTLDataset(
+    return MQTLStreamingDataset(
+        inputArgs=inputArgs,
         someDataset=someDataset,
         dnaSeqTokenizer=tokenizer,
         seqLength=window,
-        toKmer=False,
         datasetLen = dataset_len
     )
 
-def createHyenaDnaPagingTrainValTestDatasets(
+def createStreamingTrainValTestDatasets(
+        inputArgs: Namespace,
         tokenizer: PreTrainedTokenizer,
         window: int,
-) -> (HyenaDNAPagingMQTLDataset, HyenaDNAPagingMQTLDataset, HyenaDNAPagingMQTLDataset):
+) -> (MQTLStreamingDataset, MQTLStreamingDataset, MQTLStreamingDataset):
 
 
     # not sure if this is a good idea. if anything goes wrong, revert back to previous code of this function
-    train_dataset = createSingleHyenaDnaPagingDatasets(
+    train_dataset = createSingleStreamingDatasets(
+        inputArgs=inputArgs,
         split = f"train_binned_{window}",
         tokenizer=tokenizer,
         window=window,
     )
 
-    val_dataset = createSingleHyenaDnaPagingDatasets(
+    val_dataset = createSingleStreamingDatasets(
+        inputArgs=inputArgs,
         split = f"validate_binned_{window}",
         tokenizer=tokenizer,
         window=window,
     )
 
-    test_dataset = createSingleHyenaDnaPagingDatasets(
+    test_dataset = createSingleStreamingDatasets(
+        inputArgs=inputArgs,
         split = f"test_binned_{window}",
         tokenizer = tokenizer,
         window = window,
@@ -252,11 +290,18 @@ def start():
         model_name,
         trust_remote_code=True,
     )
-    mainModel = getModel(args = args)
+    mainModel = getModel(args = args, dnaTokenizer=dnaTokenizer)
 
-    train_dataset, val_dataset, test_dataset = createHyenaDnaPagingTrainValTestDatasets(
+
+    rawSequenceLength = args.WINDOW
+    if model_name == "zhihan1996/DNA_bert_6":
+        rawSequenceLength = args.WINDOW + 6 - 3
+
+
+    train_dataset, val_dataset, test_dataset = createStreamingTrainValTestDatasets(
+        inputArgs=args,
         tokenizer=dnaTokenizer,
-        window=args.WINDOW,
+        window=rawSequenceLength,
     )
 
     print(mainModel)
@@ -306,7 +351,7 @@ def start():
         strategy="auto",
     )
 
-    plModule = HyenaDNAMQTLClassifierModule(
+    plModule = MQTLClassifierModule(
         model=mainModel,
         learning_rate=args.LEARNING_RATE,
         weight_decay=args.WEIGHT_DECAY,

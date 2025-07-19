@@ -112,16 +112,16 @@ def pretty_print_metrics(metrics: dict, stage: str = ""):
 class PagingMQTLDataset(IterableDataset):
     def __init__(
             self,
+            inputArgs: Namespace,
             someDataset: Dataset,
             dnaSeqTokenizer: PreTrainedTokenizer,
             seqLength: int,
-            toKmer: bool,
             datasetLen: int
     ):
+        self.inputArgs = inputArgs
         self.someDataset = someDataset
         self.dnaSeqTokenizer = dnaSeqTokenizer
         self.seqLength = seqLength
-        self.toKmer = toKmer
         self.datasetLen = datasetLen
         pass
 
