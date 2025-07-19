@@ -11,6 +11,7 @@ BUT the dnabert preprocessor adds 2 special tokens [cls], and [sep]. so, the mod
 
 if T = 512 * n, and k = 6, then L = 512 * n + 6 - 3 = 512 * n + 3
     T ==> L
+   512 ==> 515
   1024 ==> 1027
   2048 ==> 2051
   4096 ==> 4099
@@ -18,6 +19,7 @@ if T = 512 * n, and k = 6, then L = 512 * n + 6 - 3 = 512 * n + 3
 and so on.
 """
 import argparse
+import os
 from argparse import Namespace
 
 RANDOM_SEED = 7
@@ -50,3 +52,12 @@ def parse_datagen_args() -> dict:
     }
     print(f"parse_datagen_args {mp = }")
     return mp
+
+def create_folder_if_not_exists(folder_name: str):
+    # Check if the folder exists
+    if not os.path.exists(folder_name):
+        # Create the folder
+        os.makedirs(folder_name)
+        print(f'Folder "{folder_name}" created.')
+    else:
+        print(f'Folder "{folder_name}" already exists.')

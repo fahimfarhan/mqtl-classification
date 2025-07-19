@@ -32,8 +32,11 @@ def start():
   HALF_WINDOW = mp[KEY_HALF_WINDOW]
   HALF_OF_BINNING_SIZE = mp[KEY_HALF_OF_BINNING_SIZE]
 
+  folder_name = f"_{WINDOW}_"
+  create_folder_if_not_exists(folder_name = folder_name)
+
   df_unfiltered = pd.read_csv(
-    F"st5_filtered_cosmopolitan_meqtl_snp_cpg_distance_lte_{SLIGHTLY_LARGER_WINDOW}.txt",
+    f"{folder_name}/st5_filtered_cosmopolitan_meqtl_snp_cpg_distance_lte_{SLIGHTLY_LARGER_WINDOW}.txt",
     sep="\t",
     index_col=0
   )
@@ -73,8 +76,8 @@ def start():
   negatives["label"] = 0
   negatives["snp.pos"] = -1  # ignore
   negatives["cpg.pos"] = -1  # ignore
-  positives.to_csv(f"_{WINDOW}_positives.csv")
-  negatives.to_csv(f"_{WINDOW}_negatives.csv")
+  positives.to_csv(f"{folder_name}/_{WINDOW}_positives.csv")
+  negatives.to_csv(f"{folder_name}/_{WINDOW}_negatives.csv")
 
   combined_dataset = (pd.concat([positives, negatives]))
   combined_dataset = combined_dataset.sort_values("chrom")
@@ -82,7 +85,7 @@ def start():
 
   sequences = extract_intervals_to_seqs(input_df=combined_dataset)
   combined_dataset["sequence"] = sequences
-  combined_dataset.to_csv(f"_{WINDOW}_dataset.csv")
+  combined_dataset.to_csv(f"{folder_name}/_{WINDOW}_dataset.csv")
   pass
 
 

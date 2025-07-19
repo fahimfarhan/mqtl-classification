@@ -24,7 +24,11 @@ def start():
 
   # Display or save the result
   # print(sorted_df)
-  sorted_df.to_csv(f"st5_filtered_cosmopolitan_meqtl_snp_cpg_distance_lte_{SLIGHTLY_LARGER_WINDOW}.txt", sep="\t")
+  # Specify the folder name
+  folder_name = f"_{WINDOW}_"
+  create_folder_if_not_exists(folder_name = folder_name)
+
+  sorted_df.to_csv(f"{folder_name}/st5_filtered_cosmopolitan_meqtl_snp_cpg_distance_lte_{SLIGHTLY_LARGER_WINDOW}.txt", sep="\t")
   # Optionally, you can save the result to a new file
   # sorted_df.to_csv('result.csv', index=False)
   pass
