@@ -129,3 +129,87 @@ how to fix overfitting?
 | ✅ Data augmentation          | Enrich generalization        |
 | ✅ Pretrained backbone        | Boost feature richness       |
 | ✅ LR tuning                  | Improve convergence          |
+
+```bash
+!rm -rf mqtl-classification
+!rm -rf models
+
+!git clone https://github.com/fahimfarhan/mqtl-classification.git
+# copying files to root. so output folders will be easily found at the root. No need to navigate 
+
+!mkdir -p models
+!cp mqtl-classification/src/experiment/models/*.py models/
+!cp mqtl-classification/src/experiment/*.py .
+!rm -rf mqtl-classification
+```
+
+Popular Pretrained Models for DNA/RNA Sequence Tasks
+🔹 1. HyenaDNA — (you're using this)
+
+    Pros: Handles long sequences (up to 32k tokens!), fast, low memory.
+    Use case: Long-range genomic interactions, enhancers, etc.
+    Hugging Face: LongSafari/hyenadna-small-32k-seqlen-hf
+
+🔹 2. DNABERT / DNABERT-2
+
+    Model: BERT adapted for k-mer tokenized DNA (e.g., 6-mers).
+    Pros: Simple, widely used, pretrained on human genome (hg19).
+    Use case: Promoter classification, TF binding, CpG island detection.
+
+    Hugging Face:
+        zhihan1996/DNABERT-6
+        zhihan1996/DNAbert-2-117M (improved version)
+
+    Note: Input is tokenized using overlapping k-mers (like ACGTAC → ACG, CGT, etc).
+
+🔹 3. Enformer
+
+    Model: Huge transformer trained to predict epigenomic profiles across 200k bp sequences.
+    Pros: SOTA on functional genomics benchmarks.
+    Cons: Very large (~700M+ parameters), hard to fine-tune on small data.
+    Hugging Face (converted): Search for "Enformer" or use via DeepMind repo.
+
+🔹 4. Basenji2 / BpNet
+
+    Model: Deep CNN (not transformers), effective for functional genomics (TF binding, epigenetic marks).
+    Use case: Works well on localized genomic patterns.
+    Library: Kipoi
+        Look for DeepSEA, BpNet, Basenji, etc.
+
+🔹 5. GenFormer / GPN (Genomic Perceiver)
+
+    Model: Perceiver-based model trained for genome-scale data.
+    Pros: Handles very long contexts like Hyena.
+    Cons: Research-level code.
+    Paper: "Genomic Perceiver"
+    Hugging Face (WIP): Some unofficial ports exist.
+
+🔹 6. Genome-T5 (gT5)
+
+    Model: T5-style encoder-decoder pre-trained on DNA language tasks.
+    Good for: Sequence generation or masking tasks, but can be adapted for classification.
+    Check: Papers with Code + GitHub.
+
+🔹 7. DeepSEA / DeepBind / CpGenie
+
+    Early CNN-based models for genomic feature prediction.
+    Simpler and lightweight.
+    Available via:
+        Kipoi: https://kipoi.org/models/
+        Code from their GitHub repos.
+
+
+DeepSEA/variantEffects
+DeepBind/Homo_sapiens/RBP_eIF4A3
+CpGenie
+DeepCpG
+DanQ
+Basenji
+
+
+!rm -rf mqtl-classification
+!git clone https://github.com/fahimfarhan/mqtl-classification.git
+!mkdir -p models
+!cp mqtl-classification/src/experiment/models/*.py models/
+!cp mqtl-classification/src/experiment/*.py .
+!rm -rf mqtl-classification
