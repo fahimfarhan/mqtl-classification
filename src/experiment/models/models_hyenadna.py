@@ -3,7 +3,14 @@ from torch import Tensor
 from transformers import AutoModelForSequenceClassification
 from transformers.modeling_outputs import SequenceClassifierOutput, BaseModelOutputWithNoAttention
 
-from myutils import count_parameters, freeze_module
+def count_parameters(model):
+    total = sum(p.numel() for p in model.parameters())
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total params: {total:,} | Trainable: {trainable:,}")
+
+def freeze_module(module: nn.Module):
+    for param in module.parameters():
+        param.requires_grad = False
 
 
 class HyenaDNAWithDropout(nn.Module):
