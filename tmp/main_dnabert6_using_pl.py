@@ -534,7 +534,7 @@ def start():
         gradient_clip_val=None,
         accumulate_grad_batches=1,
         precision=32,
-        default_root_dir="output_checkpoints",
+        default_root_dir="../src/experiment/output_checkpoints",
         enable_checkpointing=True,
         callbacks=[
             pl.callbacks.ModelCheckpoint(
@@ -547,7 +547,7 @@ def start():
             pl.callbacks.LearningRateMonitor(logging_interval='epoch'),
         ],
         logger=[
-            pl.loggers.TensorBoardLogger(save_dir="tensorboard", name="logs"),
+            pl.loggers.TensorBoardLogger(save_dir="../src/experiment/tensorboard", name="logs"),
             pl.loggers.WandbLogger(name=RUN_NAME, project="mqtl-classification"),
         ],
         strategy="auto",
