@@ -8,6 +8,7 @@ def start():
   WINDOW = mp[KEY_WINDOW]
   HALF_WINDOW = mp[KEY_HALF_WINDOW]
   HALF_OF_BINNING_SIZE = mp[KEY_HALF_OF_BINNING_SIZE]
+  GENOME = mp[KEY_HUMAN_GENOME]
 
   # Step 1: Read the TSV file into a DataFrame
   df = pd.read_csv('st5_cosmopolitan_meQTL_results.txt', sep='\t')
@@ -25,7 +26,7 @@ def start():
   # Display or save the result
   # print(sorted_df)
   # Specify the folder name
-  folder_name = f"_{WINDOW}_"
+  folder_name = f"{GENOME}/_{WINDOW}_"
   create_folder_if_not_exists(folder_name = folder_name)
 
   sorted_df.to_csv(f"{folder_name}/st5_filtered_cosmopolitan_meqtl_snp_cpg_distance_lte_{SLIGHTLY_LARGER_WINDOW}.txt", sep="\t")

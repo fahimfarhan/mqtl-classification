@@ -8,7 +8,7 @@ from grelu.data.preprocess import get_gc_matched_intervals
 from _00_constants import *
 
 
-def extract_intervals_to_seqs(input_df: pd.DataFrame) -> list[str]:
+def extract_intervals_to_seqs(input_df: pd.DataFrame, genome: str) -> list[str]:
   regions = pd.DataFrame()
 
   regions["chrom"] = input_df["chrom"]
@@ -19,7 +19,7 @@ def extract_intervals_to_seqs(input_df: pd.DataFrame) -> list[str]:
   input_seqs = grelu.sequence.format.convert_input_type(
     regions,
     output_type="strings",
-    genome="hg38"
+    genome=genome # "hg38"
   )
 
   return input_seqs
@@ -31,8 +31,8 @@ def start():
   WINDOW = mp[KEY_WINDOW]
   HALF_WINDOW = mp[KEY_HALF_WINDOW]
   HALF_OF_BINNING_SIZE = mp[KEY_HALF_OF_BINNING_SIZE]
-
-  folder_name = f"_{WINDOW}_"
+  GENOME = mp[KEY_HUMAN_GENOME]
+  folder_name = f"{GENOME}/_{WINDOW}_"
   create_folder_if_not_exists(folder_name = folder_name)
 
   df_unfiltered = pd.read_csv(
@@ -57,7 +57,7 @@ def start():
   print(positives.head())
 
   # creating negative dataset
-  genome = "hg38"
+  genome = GENOME # hg19 or "hg38"
 
   negatives = get_gc_matched_intervals(  # grelu.data.preprocess.get_gc_matched_intervals(
     positives,
@@ -83,7 +83,7 @@ def start():
   combined_dataset = combined_dataset.sort_values("chrom")
   print(combined_dataset.head())
 
-  sequences = extract_intervals_to_seqs(input_df=combined_dataset)
+  sequences = extract_intervals_to_seqs(input_df=combined_dataset, genome=GENOME)
   combined_dataset["sequence"] = sequences
   combined_dataset.to_csv(f"{folder_name}/_{WINDOW}_dataset.csv")
   pass

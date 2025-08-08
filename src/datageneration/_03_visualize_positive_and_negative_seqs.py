@@ -10,7 +10,9 @@ if __name__ == '__main__':
   HALF_WINDOW = mp[KEY_HALF_WINDOW]
   HALF_OF_BINNING_SIZE = mp[KEY_HALF_OF_BINNING_SIZE]
 
-  folder_name = f"_{WINDOW}_"
+  GENOME = mp[KEY_HUMAN_GENOME]
+  folder_name = f"{GENOME}/_{WINDOW}_"
+
   create_folder_if_not_exists(folder_name = folder_name)
 
   positives = pd.read_csv(f"{folder_name}/positives_{WINDOW}.csv", index_col=0)

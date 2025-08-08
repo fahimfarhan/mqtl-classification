@@ -29,10 +29,11 @@ def k_fold_split_by_chromosomes(df, k=5, seed=42):
 
     return folds
 
-def k_fold_logic(binned_df, WINDOW):
+def k_fold_logic(binned_df, WINDOW, GENOME):
   folds = k_fold_split_by_chromosomes(binned_df, k=5)
 
-  folder_name = f"_{WINDOW}_/k_fold"
+  folder_name = f"{GENOME}/_{WINDOW}_/k_fold"
+
   create_folder_if_not_exists(folder_name = folder_name)
 
   if not os.path.exists(folder_name):
@@ -69,7 +70,9 @@ def start():
   HALF_WINDOW = mp[KEY_HALF_WINDOW]
   HALF_OF_BINNING_SIZE = mp[KEY_HALF_OF_BINNING_SIZE]
 
-  folder_name = f"_{WINDOW}_"
+  GENOME = mp[KEY_HUMAN_GENOME]
+  folder_name = f"{GENOME}/_{WINDOW}_"
+
   create_folder_if_not_exists(folder_name = folder_name)
 
   df_unfiltered = pd.read_csv(f"{folder_name}/_{WINDOW}_dataset.csv")
