@@ -22,62 +22,11 @@ from torch.optim import AdamW, Optimizer
 from torch.utils.data import DataLoader
 from transformers.modeling_outputs import SequenceClassifierOutput
 from Extensions import *
-from all_models import getModel
+from all_models import getModel, MQTLStreamingDataset
 # try:
 #     from Extensions import *
 # except ImportError as ie:
 #     print(ie)
-
-class MQTLStreamingDataset(PagingMQTLDataset):
-    def preprocess(self, row: dict):
-        if self.inputArgs.MODEL_NAME == "LongSafari/hyenadna-small-32k-seqlen-hf":
-            return self.preprocess_hyena_dna(row = row)
-        elif  self.inputArgs.MODEL_NAME == "zhihan1996/DNA_bert_6":
-            return self.preprocess_dna_bert_6(row = row)
-        else:
-            raise Exception(f"unknown model name {self.inputArgs.model_name}")
-
-    def preprocess_hyena_dna(self, row: dict):
-        sequence = row["sequence"]
-        label = row["label"]
-
-        tokenizedSequence = self.dnaSeqTokenizer(sequence)
-        input_ids = tokenizedSequence["input_ids"]
-
-        input_ids_tensor: torch.Tensor = torch.tensor(input_ids).long() # need to convert to long
-        label_tensor: torch.Tensor = torch.tensor(label)
-
-        encoded_map: dict = {
-            "input_ids": input_ids_tensor,
-            "labels": label_tensor,
-        }
-        return encoded_map
-
-    def preprocess_dna_bert_6(self, row: dict):
-        sequence = row["sequence"]
-        label = row["label"]
-
-        kmerSeq = toKmerSequence(sequence)
-        kmerSeqTokenized = self.dnaSeqTokenizer(
-            kmerSeq,
-            max_length=self.inputArgs.WINDOW,
-            # self.seqLength, # I messed up with passing seqLength somewhere. For now, set the global variable WINDOW
-            padding='max_length',
-            return_tensors="pt"
-        )
-        input_ids = kmerSeqTokenized["input_ids"]
-        attention_mask = kmerSeqTokenized["attention_mask"]
-        input_ids: torch.Tensor = torch.Tensor(input_ids)
-        attention_mask = torch.Tensor(attention_mask)
-        label_tensor = torch.tensor(label)
-        encoded_map: dict = {
-            "input_ids": input_ids.long(),
-            "attention_mask": attention_mask.int(),  # hyenaDNA does not have attention layer
-            "labels": label_tensor
-        }
-
-        return encoded_map
-
 
 class MQTLClassifierModule(pl.LightningModule):
     def __init__(
@@ -213,7 +162,7 @@ def createStreamingTrainValTestDatasets(
         window: int,
 ) -> (MQTLStreamingDataset, MQTLStreamingDataset, MQTLStreamingDataset):
 
-    dataset_map: DatasetDict = load_dataset("fahimfarhan/mqtl-classification-datasets", streaming=True)
+    dataset_map: DatasetDict = load_dataset(f"fahimfarhan/mqtl-classification-datasets-{inputArgs.GENOME}", streaming=True)
 
     # not sure if this is a good idea. if anything goes wrong, revert back to previous code of this function
     train_dataset = createSingleStreamingDatasets(
@@ -279,6 +228,7 @@ def start():
     print(f"OPTIMIZER: {args.OPTIMIZER}")
     print(f"EARLY_STOPPING: {args.EARLY_STOPPING}")
     print(f"KIPOI_FINE_TUNE: {args.KIPOI_FINE_TUNE}")
+    print(f"GENOME: {args.GENOME}")
     print("=" * 60)
 
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # to prevent out of memory error
@@ -291,10 +241,13 @@ def start():
 
     model_name = args.MODEL_NAME
 
-    dnaTokenizer = AutoTokenizer.from_pretrained(
-        model_name,
-        trust_remote_code=True,
-    )
+    dnaTokenizer = None
+
+    if model_name in ["zhihan1996/DNA_bert_6", "LongSafari/hyenadna-small-32k-seqlen-hf"]:
+        dnaTokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            trust_remote_code=True,
+        )
     mainModel = getModel(args = args, dnaTokenizer=dnaTokenizer)
 
 

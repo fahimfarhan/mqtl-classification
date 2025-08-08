@@ -7,6 +7,7 @@ python3 main.py \
   --MODEL_NAME LongSafari/hyenadna-small-32k-seqlen-hf \
   --MODEL_VARIANT HyenaDNAWithDropoutAndNorm \
   --RUN_NAME_PREFIX hyena-dna-mqtl-classifier \
+  --GENOME hg19 \
   --WINDOW 1024 \
   --NUM_EPOCHS 15 \
   --ENABLE_LOGGING \
@@ -65,6 +66,7 @@ python3 main.py \
   --MODEL_NAME LongSafari/hyenadna-small-32k-seqlen-hf \
   --MODEL_VARIANT HyenaDNAWithDropoutAndNorm \
   --RUN_NAME_PREFIX hyena-dna-mqtl-classifier \
+  --GENOME hg19 \
   --WINDOW 1024 \
   --NUM_EPOCHS 10 \
   --LEARNING_RATE 5e-4 \
@@ -80,6 +82,7 @@ python3 main.py \
   --MODEL_NAME LongSafari/hyenadna-small-32k-seqlen-hf \
   --MODEL_VARIANT HyenaDNAWithDropoutBatchNorm1d \
   --RUN_NAME_PREFIX hyena-dna-mqtl-classifier \
+  --GENOME hg19 \
   --WINDOW 1024 \
   --NUM_EPOCHS 3 \
   --LEARNING_RATE 5e-5 \
@@ -95,6 +98,7 @@ python3 main.py \
   --MODEL_NAME zhihan1996/DNA_bert_6 \
   --MODEL_VARIANT default \
   --RUN_NAME_PREFIX dnabert6-mqtl-classifier \
+  --GENOME hg19 \
   --WINDOW 512 \
   --NUM_EPOCHS 3 \
   --LEARNING_RATE 5e-5 \
@@ -103,6 +107,23 @@ python3 main.py \
   --OPTIMIZER adamw \
   --DROP_OUT_PROBABILITY 0.5 \
   --CRITERION_LABEL_SMOOTHENING 0.1
+  
+# beluga
+!python3 main.py \
+  --MODEL_NAME DeepSEA/beluga \
+  --MODEL_VARIANT default \
+  --RUN_NAME_PREFIX beluga-mqtl-classifier \
+  --GENOME hg19 \
+  --WINDOW 2000 \
+  --NUM_EPOCHS 3 \
+  --LEARNING_RATE 5e-5 \
+  --WEIGHT_DECAY 0 \
+  --GRADIENT_CLIP 5.0 \
+  --OPTIMIZER adamw \
+  --DROP_OUT_PROBABILITY 0.5 \
+  --CRITERION_LABEL_SMOOTHENING 0.1
+
+  # --KIPOI_FINE_TUNE 
 ```
 
 6.0s	0	0.00s - Debugger warning: It seems that frozen modules are being used, which may

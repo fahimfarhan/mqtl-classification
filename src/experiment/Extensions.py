@@ -330,6 +330,7 @@ def parse_args() -> Namespace:
     DEFAULT_DROP_OUT_PROBABILITY = 0.25
     DEFAULT_CRITERION_LABEL_SMOOTHENING = 0.1 # criterion_label_smoothening
     DEFAULT_KIPOI_FINE_TUNE = False
+    DEFAULT_GENOME = "hg19" # hg38
     # ------------------------
     # Argument Parsing
     # ------------------------
@@ -378,6 +379,8 @@ def parse_args() -> Namespace:
                         help="Set the criterion label smoothening")
     parser.add_argument("--OPTIMIZER", type=str, default=DEFAULT_OPTIMIZER,
                         help="Set the optimizer")
+    parser.add_argument("--GENOME", type=str, default=DEFAULT_GENOME,
+                        help="Default human genome")
     return parser.parse_args()
 
 def get_optimizer(name, parameters, lr, weight_decay):
@@ -412,5 +415,6 @@ class MyArgs:
     OPTIMIZER = "adam"
     DROP_OUT_PROBABILITY = 0.25
     CRITERION_LABEL_SMOOTHENING = 0.1
-    DEFAULT_EARLY_STOPPING = False
+    EARLY_STOPPING = False
     KIPOI_FINE_TUNE = False
+    GENOME = "hg19"

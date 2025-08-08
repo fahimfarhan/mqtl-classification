@@ -140,7 +140,7 @@ def getModel(args: Namespace, dnaTokenizer: BertTokenizer) -> nn.Module:
 
             return mainModel
 
-    if base_model_name == "":
+    if base_model_name == "DeepSEA/beluga":
         return BelugaMQTLClassifier(
             dropout_prob=args.DROP_OUT_PROBABILITY,
             criterion_label_smoothening=args.CRITERION_LABEL_SMOOTHENING,
