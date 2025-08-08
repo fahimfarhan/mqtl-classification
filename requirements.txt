@@ -41,3 +41,6 @@ huggingface_hub[hf_xet]  # sth to do with offline support
 tensorboard
 lightning~=2.5.1.post0
 pytorch-lightning~=2.5.1.post0
+kipoi
+kipoiseq
+pybedtools

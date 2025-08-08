@@ -5,6 +5,74 @@ from transformers import AutoModel, BertTokenizer, AutoConfig
 
 from models.models_hyenadna import *
 from models.models_dnabert import *
+from models.belugamqtlclassifier import *
+from Extensions import PagingMQTLDataset, toKmerSequence
+
+class MQTLStreamingDataset(PagingMQTLDataset):
+    def preprocess(self, row: dict):
+        if self.inputArgs.MODEL_NAME == "LongSafari/hyenadna-small-32k-seqlen-hf":
+            return self.preprocess_hyena_dna(row = row)
+        elif  self.inputArgs.MODEL_NAME == "zhihan1996/DNA_bert_6":
+            return self.preprocess_dna_bert_6(row = row)
+        elif self.inputArgs.MODEL_NAME == "DeepSEA/beluga":
+            return self.preprocess_beluga(row = row)
+        else:
+            raise Exception(f"unknown model name {self.inputArgs.model_name}")
+
+    def preprocess_beluga(self, row: dict):
+        sequence = row["sequence"]
+        label = row["label"]
+
+        encoded = preprocess_beluga_encode_seqs(seqs = [sequence], input_size=self.inputArgs.WINDOW)
+        encoded_tensor = torch.tensor(encoded, dtype=torch.float32)  # convert to Tensor
+        label_tensor: torch.Tensor = torch.tensor(label)
+
+        encoded_map: dict = {
+            "ohe_sequences": encoded_tensor,
+            "labels": label_tensor,
+        }
+        return encoded_map
+
+    def preprocess_hyena_dna(self, row: dict):
+        sequence = row["sequence"]
+        label = row["label"]
+
+        tokenizedSequence = self.dnaSeqTokenizer(sequence)
+        input_ids = tokenizedSequence["input_ids"]
+
+        input_ids_tensor: torch.Tensor = torch.tensor(input_ids).long() # need to convert to long
+        label_tensor: torch.Tensor = torch.tensor(label)
+
+        encoded_map: dict = {
+            "input_ids": input_ids_tensor,
+            "labels": label_tensor,
+        }
+        return encoded_map
+
+    def preprocess_dna_bert_6(self, row: dict):
+        sequence = row["sequence"]
+        label = row["label"]
+
+        kmerSeq = toKmerSequence(sequence)
+        kmerSeqTokenized = self.dnaSeqTokenizer(
+            kmerSeq,
+            max_length=self.inputArgs.WINDOW,
+            # self.seqLength, # I messed up with passing seqLength somewhere. For now, set the global variable WINDOW
+            padding='max_length',
+            return_tensors="pt"
+        )
+        input_ids = kmerSeqTokenized["input_ids"]
+        attention_mask = kmerSeqTokenized["attention_mask"]
+        input_ids: torch.Tensor = torch.Tensor(input_ids)
+        attention_mask = torch.Tensor(attention_mask)
+        label_tensor = torch.tensor(label)
+        encoded_map: dict = {
+            "input_ids": input_ids.long(),
+            "attention_mask": attention_mask.int(),  # hyenaDNA does not have attention layer
+            "labels": label_tensor
+        }
+
+        return encoded_map
 
 
 def getModel(args: Namespace, dnaTokenizer: BertTokenizer) -> nn.Module:
@@ -72,4 +140,10 @@ def getModel(args: Namespace, dnaTokenizer: BertTokenizer) -> nn.Module:
 
             return mainModel
 
+    if base_model_name == "":
+        return BelugaMQTLClassifier(
+            dropout_prob=args.DROP_OUT_PROBABILITY,
+            criterion_label_smoothening=args.CRITERION_LABEL_SMOOTHENING,
+            finetune=args.KIPOI_FINE_TUNE,
+        )
     raise ValueError(f"Unknown base model: {base_model_name}, or model variant: {model_variant}")

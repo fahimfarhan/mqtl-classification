@@ -329,6 +329,7 @@ def parse_args() -> Namespace:
     DEFAULT_OPTIMIZER = "adam"
     DEFAULT_DROP_OUT_PROBABILITY = 0.25
     DEFAULT_CRITERION_LABEL_SMOOTHENING = 0.1 # criterion_label_smoothening
+    DEFAULT_KIPOI_FINE_TUNE = False
     # ------------------------
     # Argument Parsing
     # ------------------------
@@ -352,6 +353,8 @@ def parse_args() -> Namespace:
                         help="Enable logging with tools like W&B")
     parser.add_argument("--EARLY_STOPPING", action="store_true", default=DEFAULT_EARLY_STOPPING,
                         help="Stop early if eval scores aren't updating.")
+    parser.add_argument("--KIPOI_FINE_TUNE", action="store_true", default=DEFAULT_KIPOI_FINE_TUNE,
+                        help="Define if we should enable model weights update, or not.")
 
     # Optional: override naming
     parser.add_argument("--RUN_NAME_SUFFIX", type=str, default=DEFAULT_RUN_NAME_SUFFIX,
@@ -410,3 +413,4 @@ class MyArgs:
     DROP_OUT_PROBABILITY = 0.25
     CRITERION_LABEL_SMOOTHENING = 0.1
     DEFAULT_EARLY_STOPPING = False
+    KIPOI_FINE_TUNE = False

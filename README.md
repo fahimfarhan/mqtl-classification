@@ -205,6 +205,10 @@ CpGenie
 DeepCpG
 DanQ
 Basenji
+DeepSea/Begula
+Expecto
+BPNet
+
 
 
 !rm -rf mqtl-classification

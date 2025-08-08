@@ -278,6 +278,7 @@ def start():
     print(f"CRITERION_LABEL_SMOOTHENING: {args.CRITERION_LABEL_SMOOTHENING}")
     print(f"OPTIMIZER: {args.OPTIMIZER}")
     print(f"EARLY_STOPPING: {args.EARLY_STOPPING}")
+    print(f"KIPOI_FINE_TUNE: {args.KIPOI_FINE_TUNE}")
     print("=" * 60)
 
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # to prevent out of memory error
