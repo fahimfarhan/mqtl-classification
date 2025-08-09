@@ -130,13 +130,8 @@ class BelugaMQTLClassifier(nn.Module):
         for param in module.parameters():
             param.requires_grad = False
 
-    def forward(self, x):
-        seqs = x["ohe_sequences"]
-        labels = x["labels"]
-
-        print(f"seqs.shape = {seqs.shape}")
-        print(f"seqs.size = {seqs.size}")
-        h = self.model(seqs)
+    def forward(self, ohe_sequences, labels = None):
+        h = self.model(ohe_sequences)
         h = self.dropout(h)
         logits = self.classifier(h)
 
@@ -210,7 +205,7 @@ def simpletest(finetune: bool):
         "labels": labels,           # dummy batch of size 2
     }
 
-    output = model.forward(batch)
+    output = model.forward(encoded, labels)
     print(output)
 
 

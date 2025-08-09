@@ -11,6 +11,7 @@ the steps:
 * push weights, & biases to wandb
 * save the kaggle notebook result into github
 """
+from transformers.data.data_collator import torch_default_data_collator
 
 """ import dependencies """
 from typing import Optional, Union
@@ -264,7 +265,12 @@ def start():
 
     print(mainModel)
 
-    dataCollator = DataCollatorWithPadding(tokenizer=dnaTokenizer)
+    dataCollator = None
+    if dnaTokenizer is not None:
+        dataCollator = DataCollatorWithPadding(tokenizer=dnaTokenizer)
+    else:
+        dataCollator = torch_default_data_collator
+
     train_loader = DataLoader(train_dataset, batch_size=per_device_batch_size, shuffle=False, collate_fn=dataCollator) # Can't shuffle the paging/streaming datasets
     val_loader = DataLoader(val_dataset, batch_size=per_device_batch_size, shuffle=False, collate_fn=dataCollator)
     test_loader = DataLoader(test_dataset, batch_size=per_device_batch_size, shuffle=False, collate_fn=dataCollator)
