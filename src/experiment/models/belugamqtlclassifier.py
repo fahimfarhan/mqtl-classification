@@ -131,6 +131,8 @@ class BelugaMQTLClassifier(nn.Module):
             param.requires_grad = False
 
     def forward(self, ohe_sequences, labels = None):
+        print(f"==> inside forward: {ohe_sequences.shape = }")
+        print(f"==> inside forward: {labels.shape = }")
         h = self.model(ohe_sequences)
         h = self.dropout(h)
         logits = self.classifier(h)
@@ -184,28 +186,79 @@ def encodeSeqs(seqs, inputsize=2000):
     seqsnp = np.concatenate([seqsnp, dataflip], axis=0)
     return seqsnp
 
-def preprocess_beluga_encode_seqs(seqs, input_size=2000):
-    return encodeSeqs(seqs, input_size)
+# based on the original,
+def encodeSeq(seq: str, inputsize: int=2000):
+    """Convert a single DNA sequence to 0-1 one-hot encoding and truncate to input size.
+
+    Args:
+        seq: single DNA sequence string
+        inputsize: number of base pairs to encode (centered)
+
+    Returns:
+        numpy array of shape (2, 4, inputsize) — concatenation of forward and reverse complement
+    """
+
+    seqnp = np.zeros((1, 4, inputsize), np.bool_)
+
+    mydict = {
+        'A': np.asarray([1, 0, 0, 0]), 'G': np.asarray([0, 1, 0, 0]),
+        'C': np.asarray([0, 0, 1, 0]), 'T': np.asarray([0, 0, 0, 1]),
+        'N': np.asarray([0, 0, 0, 0]), 'H': np.asarray([0, 0, 0, 0]),
+        'a': np.asarray([1, 0, 0, 0]), 'g': np.asarray([0, 1, 0, 0]),
+        'c': np.asarray([0, 0, 1, 0]), 't': np.asarray([0, 0, 0, 1]),
+        'n': np.asarray([0, 0, 0, 0]), '-': np.asarray([0, 0, 0, 0])
+    }
+
+    # center-crop the sequence to inputsize
+    start = int(math.floor((len(seq) - inputsize) / 2))
+    end = start + inputsize
+    cline = seq[start:end]
+
+    for i, c in enumerate(cline):
+        seqnp[0, :, i] = mydict.get(c, np.asarray([0, 0, 0, 0]))  # use zeros if unknown char
+
+    # get the complementary sequence by flipping both axes (reverse complement)
+    dataflip = seqnp[:, ::-1, ::-1]
+
+    # concatenate forward and reverse complement along axis=0
+    encoded = np.concatenate([seqnp, dataflip], axis=0)  # shape (2, 4, inputsize)
+
+    return encoded
+
+def preprocess_beluga_encode_seq(seq: str, input_size: int=2000):
+    encoded =  encodeSeq(seq, input_size)
+    encoded_tensor = torch.tensor(encoded, dtype=torch.float32)  # convert to Tensor
+    print(f"===> before {encoded_tensor.shape = }") #  torch.Size([2, 4, 2000])
+    print(f"===> before {encoded_tensor.size = }")
+
+    # encoded_tensor = encoded_tensor.unsqueeze(2) # .to(device=DEVICE)
+    # print(f"===> after {encoded_tensor.shape = }")
+    # print(f"===> after {encoded_tensor.size = }")
+    return encoded_tensor
 
 def simpletest(finetune: bool):
     model = BelugaMQTLClassifier(finetune=finetune).to(device=DEVICE)
     seq = "ATCG" * 500  # 2000 bp
     print(f"seq = {len(seq) = }")
 
-    encoded = encodeSeqs([seq])  # shape: (2, 4, 2000) due to forward+reverse
-    print(f"{encoded.shape = }")  # (2, 4, 2000)
+    # encoded = encodeSeqs([seq])  # shape: (2, 4, 2000) due to forward+reverse
+    encoded_tensor = preprocess_beluga_encode_seq(seq)
+    encoded_tensor = encoded_tensor.to(device=DEVICE)
+    print(f"before {encoded_tensor.shape = }")  # torch.Size([2, 4, 2000])
 
-    encoded = torch.tensor(encoded, dtype=torch.float32)  # convert to Tensor
-    encoded = encoded.unsqueeze(2).to(device = DEVICE)  # [2, 4, 1, 2000]
+    # encoded = torch.tensor(encoded, dtype=torch.float32)  # convert to Tensor
+    encoded_tensor = encoded_tensor.unsqueeze(2).to(device = DEVICE)  # torch.Size([2, 4, 1, 2000])
+    print(f"after {encoded_tensor.shape = }")  # torch.Size([2, 4, 1, 2000])
 
     labels = torch.tensor([1, 1]).to(device = DEVICE)
+    print(f"{labels.shape = }")  # torch.Size([2])
 
     batch = {
-        "ohe_sequences": encoded,                        # shape: [2, 4, 2000]
+        "ohe_sequences": encoded_tensor,                        # shape: [2, 4, 2000]
         "labels": labels,           # dummy batch of size 2
     }
 
-    output = model.forward(encoded, labels)
+    output = model.forward(encoded_tensor, labels)
     print(output)
 
 
@@ -245,3 +298,7 @@ if __name__ == '__main__':
     # simpletest_with_kipoi_preprocess(True)
     # simpletest_with_kipoi_preprocess(False)
     pass
+
+# torch.Size([2, 4, 2000]) a single sequence
+#   => (forward, reverse) x ATCG x seq_leng
+#     2 x 4 x 2000

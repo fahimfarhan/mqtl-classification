@@ -23,9 +23,9 @@ class MQTLStreamingDataset(PagingMQTLDataset):
         sequence = row["sequence"]
         label = row["label"]
 
-        encoded = preprocess_beluga_encode_seqs(seqs = [sequence], input_size=self.inputArgs.WINDOW)
-        encoded_tensor = torch.tensor(encoded, dtype=torch.float32)  # convert to Tensor
-        label_tensor: torch.Tensor = torch.tensor(label)
+        encoded_tensor = preprocess_beluga_encode_seq(seq = sequence, input_size=self.inputArgs.WINDOW)
+        encoded_tensor = encoded_tensor.unsqueeze(2)
+        label_tensor = torch.tensor([label, label])
 
         encoded_map: dict = {
             "ohe_sequences": encoded_tensor,
