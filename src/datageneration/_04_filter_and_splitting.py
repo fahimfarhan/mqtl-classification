@@ -5,62 +5,6 @@ import grelu.data.preprocess
 import pandas as pd
 from _00_constants import *
 
-from sklearn.model_selection import KFold
-import random
-
-def k_fold_split_by_chromosomes(df, k=5, seed=42):
-    chroms = [f"chr{i}" for i in range(1, 23)]
-    random.seed(seed)
-    random.shuffle(chroms)
-
-    folds = []
-    fold_size = len(chroms) // k
-
-    for i in range(k):
-        test_chroms = chroms[i*fold_size:(i+1)*fold_size]
-        remaining = [c for c in chroms if c not in test_chroms]
-
-        # Use the next fold-sized chunk for validation
-        j = (i + 1) % k
-        val_chroms = chroms[j*fold_size:(j+1)*fold_size]
-        train_chroms = [c for c in chroms if c not in test_chroms + val_chroms]
-
-        folds.append((train_chroms, val_chroms, test_chroms))
-
-    return folds
-
-def k_fold_logic(binned_df, WINDOW, GENOME):
-  folds = k_fold_split_by_chromosomes(binned_df, k=5)
-
-  folder_name = f"{GENOME}/_{WINDOW}_/k_fold"
-
-  create_folder_if_not_exists(folder_name = folder_name)
-
-  if not os.path.exists(folder_name):
-      # Create the folder
-      os.makedirs(folder_name)
-
-  for fold_idx, (train_chroms, val_chroms, test_chroms) in enumerate(folds):
-    print(f"\n=== Fold {fold_idx + 1} ===")
-    print(f"Train: {train_chroms}")
-    print(f"Val:   {val_chroms}")
-    print(f"Test:  {test_chroms}")
-
-    train, validate, test = grelu.data.preprocess.split(
-      data=binned_df,
-      train_chroms=train_chroms,
-      val_chroms=val_chroms,
-      test_chroms=test_chroms,
-    )
-
-    train = train.sample(frac=1).reset_index(drop=True)
-    validate = validate.sample(frac=1).reset_index(drop=True)
-    test = test.sample(frac=1).reset_index(drop=True)
-
-    train.to_csv(f"{folder_name}/_{WINDOW}_train_fold{fold_idx + 1}.csv", index=False)
-    validate.to_csv(f"{folder_name}/_{WINDOW}_validate_fold{fold_idx + 1}.csv", index=False)
-    test.to_csv(f"{folder_name}/_{WINDOW}_test_fold{fold_idx + 1}.csv", index=False)
-
 def start():
   start_time = time.time()
 
@@ -71,7 +15,9 @@ def start():
   HALF_OF_BINNING_SIZE = mp[KEY_HALF_OF_BINNING_SIZE]
 
   GENOME = mp[KEY_HUMAN_GENOME]
-  folder_name = f"{GENOME}/_{WINDOW}_"
+  EXP_NAME = mp[KEY_EXP_NAME]
+
+  folder_name = f"{EXP_NAME}/{GENOME}/_{WINDOW}_"
 
   create_folder_if_not_exists(folder_name = folder_name)
 
@@ -122,9 +68,6 @@ def start():
   train.to_csv(f"{folder_name}/_{WINDOW}_train{file_suffix}.csv", index=False)
   validate.to_csv(f"{folder_name}/_{WINDOW}_validate{file_suffix}.csv", index=False)
   test.to_csv(f"{folder_name}/_{WINDOW}_test{file_suffix}.csv", index=False)
-
-  # also create dataset based on k fold logic
-  # k_fold_logic(binned_df, WINDOW)  # todo: maybe later
 
   # Record the end time
   end_time = time.time()

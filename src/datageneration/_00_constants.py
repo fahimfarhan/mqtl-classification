@@ -29,6 +29,7 @@ KEY_HALF_WINDOW = "HALF_WINDOW"
 KEY_SLIGHTLY_LARGER_WINDOW = "SLIGHTLY_LARGER_WINDOW"
 KEY_HALF_OF_BINNING_SIZE = "HALF_OF_BINNING_SIZE"
 KEY_HUMAN_GENOME = "HUMAN_GENOME"
+KEY_EXP_NAME = "EXP_NAME"
 
 def parse_datagen_args() -> dict:
     # ------------------------
@@ -36,6 +37,8 @@ def parse_datagen_args() -> dict:
     # ------------------------
     DEFAULT_WINDOW = 1024
     DEFAULT_HG = "hg19" # "hg38"
+    DEFAULT_EXP_NAME = "mqtl_classification"
+
     parser = argparse.ArgumentParser(description="Initialize data generation")
     parser.add_argument("--WINDOW", type=int, default=DEFAULT_WINDOW,
                         help="Sliding window size for input sequences")
@@ -43,7 +46,11 @@ def parse_datagen_args() -> dict:
     parser.add_argument("--GENOME", type=str, default=DEFAULT_HG,
                         help="Human genome version")
 
+    parser.add_argument("--EXP_NAME", type=str, default=DEFAULT_EXP_NAME,
+                        help="Generate dataset for the experiment name. put the dataset under this forder")
+
     args = parser.parse_args()
+    experiment_name = args.EXP_NAME
     window = args.WINDOW
     genome = args.GENOME
     half_window = args.WINDOW // 2
@@ -56,6 +63,7 @@ def parse_datagen_args() -> dict:
         KEY_SLIGHTLY_LARGER_WINDOW : slightly_larger_window,
         KEY_HALF_OF_BINNING_SIZE : half_of_binning_size,
         KEY_HUMAN_GENOME: genome,
+        KEY_EXP_NAME: experiment_name,
     }
     print(f"parse_datagen_args {mp = }")
     return mp

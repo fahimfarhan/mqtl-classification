@@ -4,7 +4,7 @@ if __name__ == "__main__":
     sizes = [128, 256, 512, 515, 1024, 1027, 2000, 2048, 2051] # , 4096, 4099
     splits = ["train", "validate", "test"]
     genome = "hg19" # "hg38"
-
+    experiment_name = "mqtl_classification"
     data_files = {}
 
     for size in sizes:

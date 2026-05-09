@@ -32,7 +32,9 @@ def start():
   HALF_WINDOW = mp[KEY_HALF_WINDOW]
   HALF_OF_BINNING_SIZE = mp[KEY_HALF_OF_BINNING_SIZE]
   GENOME = mp[KEY_HUMAN_GENOME]
-  folder_name = f"{GENOME}/_{WINDOW}_"
+  EXP_NAME = mp[KEY_EXP_NAME]
+
+  folder_name = f"{EXP_NAME}/{GENOME}/_{WINDOW}_"
   create_folder_if_not_exists(folder_name = folder_name)
 
   df_unfiltered = pd.read_csv(

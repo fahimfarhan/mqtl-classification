@@ -11,7 +11,9 @@ if __name__ == '__main__':
   HALF_OF_BINNING_SIZE = mp[KEY_HALF_OF_BINNING_SIZE]
 
   GENOME = mp[KEY_HUMAN_GENOME]
-  folder_name = f"{GENOME}/_{WINDOW}_"
+  EXP_NAME = mp[KEY_EXP_NAME]
+
+  folder_name = f"{EXP_NAME}/{GENOME}/_{WINDOW}_"
 
   create_folder_if_not_exists(folder_name = folder_name)
 
