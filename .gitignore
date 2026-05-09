@@ -173,6 +173,8 @@ src/lightning_logs/
 !/src/datageneration/errorlog.log
 !/src/datageneration/_00_constants.py
 !/src/datageneration/_00_quickrun.sh
+!/src/datageneration/_00_quickrun_percentile.sh
+!/src/datageneration/_00_quickrun_fake_dataset.sh
 !/src/datageneration/_00_download_dataset.sh
 !/src/datageneration/_01_preprocess_cosmopolitan_meqtl.py
 !/src/datageneration/_02_generate_positive_and_negative_sequences.py
@@ -180,8 +182,10 @@ src/lightning_logs/
 !/src/datageneration/_04_filter_and_splitting.py
 !/src/datageneration/_05_mqtl_dataset.py
 !/src/datageneration/_06_uploaddataset_to_hugging_face.py
-!/src/datageneration/_10_convert_tsv_into_sqlite.py
-!/src/datageneration/_11_sql_commands.sql
+!/src/datageneration/_07_percentile_dataset.py
+!/src/datageneration/_08_fake_motif_dataset_to_ensure_model_is_learning.py
+!/src/datageneration/_90_convert_tsv_into_sqlite.py
+!/src/datageneration/_91_sql_commands.sql
 
 # Ignore PyTorch model checkpoints and outputs
 output_checkpoints/
